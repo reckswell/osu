@@ -1333,7 +1333,7 @@ alternatives considered, how to reverse. If a later decision overrides one, add 
   and not on fresh ones (already on Chunithm's scale).
 - **Speed steps** are each game's: Chunithm 0.25, SDVX 0.01 (keys 0.1), Project Sekai 0.01 (keys 0.1). Alpha wrote
   "increments of 1" for Sekai; the official game moved to 0.01 steps in April 2024 and most players sit at 10.5-11.3
-  (`game-sekai.md`), so 0.01 until Alpha answers the decision card.
+  (`game-sekai.md`). Asked on a decision card: Alpha chose 0.01, like the game today (2026-11-08).
 - **SDVX's far edge** is USC's faithful 0.284 ("sdvx has notes appearing from the center of the screen"; Q7). Its 1.25%
   notes are then 0.77 of Chunithm's height at the line, as the research's 76 px against 81-98 px.
 - **Project Sekai** has the fan engine's line (20.9% up) and width (0.787), and a stand-in far edge: its far/near width is
