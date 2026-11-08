@@ -209,7 +209,8 @@ Only after Alpha confirms. See the design doc's "Local-only vs self-hosted serve
   "Game preset" (the game, Speed, Lane and camera, Lane and note size, Wall), groups that fold and stay as left; each
   game remembers its settings (SDVX no wall, Chunithm its last wall and speed); the wall keys do nothing in a game
   without a wall. Gate: `TestSettingsPanel`, `TestSettingsFold`, `TestEachGameRemembersItsSettings`,
-  `TestWallInAGamesPreset`, `TestGameMemoryStartsFromAnInstallBefore`, `TestNoWallKeysInAGameWithout`.
+  `TestWallInAGamesPreset`, `TestGameMemoryStartsFromAnInstallBefore`, `TestNoWallKeysInAGameWithout`; walked in the
+  full game's settings overlay with the mouse by `TestSceneSettingsMenu` (captures under the playtest harness).
 - [ ] The settings-by-game menu checked in the game on Alpha's PC, every preset (Alpha's ask, 2026-11-08: "update the
   game and extensively check through the menu"); needs computer use on Alpha's PC. orthomania.exe's own ruleset copy
   (Reckswell/orthomania) synced and released by the patcher thread.
