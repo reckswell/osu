@@ -1300,3 +1300,6 @@ alternatives considered, how to reverse. If a later decision overrides one, add 
   build skips). osu!'s own "Import from osu!stable" still hard-links stable's files (their contents never change) and, in
   its first-run screen, writes and deletes an empty `_hard_link_test` file in stable's `Songs` folder to see whether
   links work: asked Alpha whether to keep that or patch osu! to copy instead.
+- **Alpha chose** (decision card, 2026-11-08): keep hard links. No core patch; stable's file contents never change, and
+  the import's one empty test file in `Songs` is accepted. (A copy patch, `OSU_DISABLE_HARD_LINKS` in
+  `osu.Game/IO/HardLinkHelper.cs` with a test, was written and passed, then dropped.)
