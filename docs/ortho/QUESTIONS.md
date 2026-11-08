@@ -86,6 +86,11 @@ SPEC 2 and Alpha's brief say notes come from the top of the screen.
 - **Answer** (Alpha, 2026-11-08, presets by game): (a) for Chunithm ("a consistent projection of notes from the top of
   the screen to the bottom"); SDVX's notes come "from the center of the screen", so Voltex has USC's faithful far edge,
   0.284. The lane tilt thread's camera (tilt, lane length, field of view) refines both.
+- **Answer** (Alpha, 2026-11-08, after the lane tilt renders): (b) for Chunithm after all: "chunithm's notes don't
+  actually come from the very top of the screen (still a bit of section where they display things like score, passing,
+  justice count, life, etc.) so measure this first". Measured again on Alpha's frame (the score frame ends 16.2-16.5%
+  down, as the research's 16.3%): the preset is the arcade's lane, 56.3° and 3.30 long. No frame is drawn over the band;
+  osu!'s own HUD and the background show there.
 
 ### Q8. Wall behaviour in the Chunithm preset
 In the arcade the field wall is off by default, goes up to about 90% of the track, and keeps note speed (visible time

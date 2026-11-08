@@ -214,7 +214,7 @@ Only after Alpha confirms. See the design doc's "Local-only vs self-hosted serve
   lane width; ported and warped skin stages keep their widths.
 - [x] Share osu!mania's keys as a switch (Alpha's ask, 2026-11-07).
 - [x] Lane tilt (Alpha's ask, 2026-11-08): "Lane tilt" and "Lane length" replace the far edge sliders, one 60° camera for
-  every preset (Chunithm 47.5°, Project Sekai 57.8°, SDVX EG's 81.4°); "Note approach" from true perspective through
+  every preset (Chunithm 56.3° under its HUD, Project Sekai 57.8°, SDVX EG's 81.4°); "Note approach" from true perspective through
   Project Sekai's curve to an even speed; optional "Kiai lift" (SDVX's chorus pitch, off by default)
   (`research/topic-approach-angles.md`, `research/topic-camera-motion.md`; DECISIONS 2026-11-08). Gate: `HighwayCameraTest`,
   `ApproachCurveTest`, `KiaiLiftTest`, `TestLaneTiltByGame`, `TestCustomCameraKeptAsTilt`, `TestLaneTiltSettings`,

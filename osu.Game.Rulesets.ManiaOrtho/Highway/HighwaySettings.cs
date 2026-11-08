@@ -263,14 +263,14 @@ namespace osu.Game.Rulesets.ManiaOrtho.Highway
         public float Approach { get; init; }
 
         /// <summary>
-        /// Chunithm's lane tilt, reaching the top edge (<see cref="HighwayPresets"/>).
+        /// Chunithm's lane tilt (<see cref="HighwayPresets"/>).
         /// </summary>
-        public const float DEFAULT_LANE_TILT = 47.5f;
+        public const float DEFAULT_LANE_TILT = 56.3f;
 
         /// <summary>
         /// Chunithm's lane length (<see cref="HighwayPresets"/>).
         /// </summary>
-        public const float DEFAULT_LANE_LENGTH = 3.72f;
+        public const float DEFAULT_LANE_LENGTH = 3.3f;
 
         /// <summary>
         /// The judgement line's height above the bottom of the playfield (IIDX "LIFT" is a higher value).
@@ -550,16 +550,16 @@ namespace osu.Game.Rulesets.ManiaOrtho.Highway
             switch (preset)
             {
                 case HighwayPreset.Chunithm:
-                    // Measured from the arcade (research/game-chunithm.md, and Alpha's frame in topic-approach-angles.md 7):
-                    // judgement line 7.4% above the bottom, track 0.61 of the screen wide there, far/near width 0.24. The
-                    // arcade's far edge sits 16% below the top, under its HUD frame (a lane 56.3° back, 3.30 long); here it
-                    // is stretched to the top edge so notes enter from the top (SPEC 2, QUESTIONS Q7): 47.5° back, the far end
-                    // 0.24 wide where the top edge cuts it. Same width for every key count, as in the arcade.
+                    // The arcade's own lane (research/game-chunithm.md: two arcade frames and the decoded camera; Alpha's frame
+                    // in topic-approach-angles.md 7 agrees): judgement line 7.4% above the bottom, track 0.61 of the screen
+                    // wide there, and the far edge 16.3% below the top, the bottom of the score frame, 0.24 as wide: a lane
+                    // 56.3° back and 3.30 long. Notes appear under the HUD's band, not at the top edge (Alpha 2026-11-08,
+                    // QUESTIONS Q7). Same width for every key count, as in the arcade.
                     return new HighwaySettings
                     {
                         CameraMode = HighwayCameraMode.Perspective,
-                        LaneTilt = 47.5f,
-                        LaneLength = 3.72f,
+                        LaneTilt = 56.3f,
+                        LaneLength = 3.3f,
                         Approach = ApproachCurve.PERSPECTIVE,
                         JudgementLineHeight = 0.074f,
                         TrackWidth = 0.61f,

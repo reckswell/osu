@@ -922,7 +922,7 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Configuration
         [Test]
         public void TestLaneTiltByGame()
         {
-            AddAssert("Chunithm reaches the top, 0.24 wide there", () => layoutOf(HighwayPreset.Chunithm), () => Is.EqualTo((0f, 0.24f)).Using<(float, float)>(nearLayout));
+            AddAssert("Chunithm ends under its HUD, 0.24 wide", () => layoutOf(HighwayPreset.Chunithm), () => Is.EqualTo((0.163f, 0.24f)).Using<(float, float)>(nearLayout));
             AddAssert("SDVX ends 41% down, 0.071 wide", () => layoutOf(HighwayPreset.Voltex), () => Is.EqualTo((0.41f, 0.071f)).Using<(float, float)>(nearLayout));
             AddAssert("Project Sekai ends just under the top, 0.073 wide", () => layoutOf(HighwayPreset.Sekai), () => Is.EqualTo((0.016f, 0.073f)).Using<(float, float)>(nearLayout));
             AddAssert("only Project Sekai eases its notes", () => Enum.GetValues<HighwayPreset>().Where(p => p != HighwayPreset.Custom)
@@ -1033,7 +1033,9 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Configuration
 
             AddAssert("no far edge sliders", () => this.ChildrenOfType<FormSliderBar<float>>().Select(b => b.Caption.ToString()),
                 () => Has.None.StartsWith("Far edge"));
-            AddAssert("tilt to the top", () => tiltLabel(), () => Is.EqualTo("47.5° (to the top)"));
+            AddAssert("tilt ends the lane under the HUD", () => tiltLabel(), () => Is.EqualTo("56.3° (ends 16% down)"));
+            AddStep("a lane to the top", () => gameConfig.Highway.SetValue(HighwaySetting.LaneTilt, 45f));
+            AddUntilStep("the label says so", () => tiltLabel(), () => Is.EqualTo("45.0° (to the top)"));
             AddAssert("length and approach shown", () => shown(cameraSlider("Lane length")) && shown(cameraSlider("Note approach")));
 
             AddStep("SDVX", () => gameConfig.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Voltex));

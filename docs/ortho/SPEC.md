@@ -34,20 +34,20 @@ how a point at (lane position, distance) is placed on screen.
 
 Requirements:
 
-- Notes enter at the **top edge of the screen** (or at the wall, section 4), never from a point in the middle of the
-  screen. In perspective mode the vanishing point therefore sits at or above the top of the screen, so the far end of
-  the track is a visible edge with real width, not a point.
+- Notes enter at the **far end of the lane** (or at the wall, section 4), a visible edge with real width, never a
+  point: the top edge of the screen or below it, as each game draws it (Alpha, 2026-11-08: Chunithm's notes appear
+  under its HUD band, 16% down; SDVX's towards the middle, 41% down).
 - The judgement line sits near the bottom: default 12% of screen height above the bottom edge *(tune)*.
 - Parameters (Alpha, 2026-11-08: "a slider that allows the user to adjust the angle at which the lane actually ends
   relative to the top of the screen"): **lane tilt** (0-85°, how far the lane leans back, pivoting on the judgement
   line, so more tilt ends it lower on the screen), **lane length** (0.25-16 screen heights; longer narrows the far end;
   perspective only; a lane longer than the screen allows is cut at the top edge), judgement line height and track width
   at the line (fraction of screen width; or a lane width, section 5). One camera with a fixed 60° field of view for
-  every preset, so a tilt looks the same in each (`research/topic-approach-angles.md`): Chunithm 47.5° (to the top),
-  Project Sekai 57.8°, SDVX 81.4° (ends 41% down). The parallel camera has no depth, so only its tilt counts.
+  every preset, so a tilt looks the same in each (`research/topic-approach-angles.md`): Chunithm 56.3° (ends 16% down),
+  Project Sekai 57.8° on a longer lane (to the top), SDVX 81.4° (ends 41% down). The parallel camera has no depth, so only its tilt counts.
 - **Game presets** (Alpha, 2026-11-08: "sort all of the presets by games"): each plays like one game's screen, with its
   camera, judgement line, lane or stage width and note thickness, and shows the speed and the wall in that game's
-  numbers and steps (§3, §4). Tilted: **Chunithm** (notes from the top edge), **SDVX** (notes from towards the middle,
+  numbers and steps (§3, §4). Tilted: **Chunithm** (notes from under its HUD band), **SDVX** (notes from towards the middle,
   narrow far end), **Project Sekai** (high line, very narrow far end). Straight-on: **beatmania IIDX**, **DJMAX**,
   **Quaver**, **StepMania**. **osu!mania** is mania's own stage (flat); **Parallel tilt** a neutral parallel camera.
   Games without a wall or lane cover (SDVX, Project Sekai, DJMAX, osu!mania) have none: the wall is down and its

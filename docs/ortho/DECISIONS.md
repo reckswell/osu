@@ -1416,3 +1416,20 @@ screen terms"), as that entry allowed.
   flash, and per-preset field of view.
 - **Reverse**: put `FarWidthRatio`/`FarEdgeHeight` back in `HighwaySettings` (the stored keys are still there) and
   derive tilt for display only; approach -1 everywhere restores linear depth.
+
+## 2026-11-08: Chunithm on the arcade's lane, under its HUD band (Alpha)
+
+- **Decision**: the Chunithm preset ends its lane where the arcade does, 16.3% below the top, at the bottom of its score
+  frame: 56.3° back and 3.30 long at the 60° camera, far end 0.24 as wide as the line (was 47.5°, stretched to the top
+  edge, Q7 (a)).
+- **Why**: Alpha, after the lane tilt renders: "chunithm's notes don't actually come from the very top of the screen
+  (still a bit of section where they display things like score, passing, justice count, life, etc.) so measure this
+  first". Measured on Alpha's frame: the score frame's bottom edge fades out over rows 107-110 of 668 and the track is
+  dark from row 110, so 16.2-16.5% (the frame is cropped by about 10 rows); `game-chunithm.md` has 0.163H from two arcade
+  frames and the decoded camera (the wall-0 plane at z = -460). Judgement line, width, far/near width and note
+  thickness are unchanged, so notes keep their size at the line (the TAP's 2.55% was measured on this geometry).
+- **Not drawn**: a frame over the top 16% (Q7 (c)). osu!'s own HUD (score, accuracy, combo) sits in the top corners and
+  the beatmap background shows above the lane. Easy to add as a "HUD band" option if Alpha wants the arcade's frame.
+- **Side effects**: the default camera (`HighwaySettings()`) follows; "Kiai lift" now lifts Chunithm's lane too (still
+  off by default); with the same length, a tilt of 46° or less brings the lane back to the top edge.
+- **Reverse**: `LaneTilt = 47.5f, LaneLength = 3.72f` in the Chunithm preset.

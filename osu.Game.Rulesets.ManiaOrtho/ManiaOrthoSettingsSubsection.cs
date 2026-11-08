@@ -494,8 +494,9 @@ namespace osu.Game.Rulesets.ManiaOrtho
                 {
                     Caption = "Lane tilt",
                     HintText = "How far the lane leans back, pivoting on the judgement line: more tilt ends it lower on the screen, so "
-                               + "notes come from further down. 0° stands it upright. Chunithm 47.5° (to the top), Project Sekai 57.8°, SDVX "
-                               + "81.4° (towards the middle). One camera for every game preset, so an angle looks the same in each.",
+                               + "notes come from further down. 0° stands it upright. Chunithm 56.3° (ends 16% down, under its score "
+                               + "frame), Project Sekai 57.8° on a longer lane (to the top), SDVX 81.4° (towards the middle). One camera "
+                               + "for every game preset, so an angle looks the same in each.",
                     Current = highway.GetBindable<float>(HighwaySetting.LaneTilt),
                     KeyboardStep = 0.5f,
                     LabelFormat = laneTiltLabel,
@@ -507,7 +508,7 @@ namespace osu.Game.Rulesets.ManiaOrtho
                 {
                     Caption = "Lane length",
                     HintText = "How long the lane is, in screen heights: longer narrows its far end, so notes start smaller and speed up "
-                               + "more near the line. Chunithm 3.72, SDVX 11.46, Project Sekai 13. A lane longer than the screen allows "
+                               + "more near the line. Chunithm 3.3, SDVX 11.46, Project Sekai 13. A lane longer than the screen allows "
                                + "is cut at the top edge. Perspective camera only.",
                     Current = highway.GetBindable<float>(HighwaySetting.LaneLength),
                     KeyboardStep = 0.1f,
