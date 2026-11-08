@@ -54,9 +54,11 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Highway
             {
                 config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Custom);
                 config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Chunithm);
-                config.Highway.GetBindable<WallScale>(HighwaySetting.WallScale).SetDefault();
+                config.Highway.SetValue(HighwaySetting.Wall, 0f); // a game with a wall leaves it to the player
+                // The Chunithm preset shows Chunithm's numbers; these tests start from percent and osu!mania's.
+                config.Highway.SetValue(HighwaySetting.WallScale, WallScale.Percent);
                 config.Highway.GetBindable<bool>(HighwaySetting.WallKeepsVisibleTime).SetDefault();
-                config.Highway.GetBindable<SpeedScale>(HighwaySetting.SpeedScale).SetDefault();
+                config.Highway.SetValue(HighwaySetting.SpeedScale, SpeedScale.Mania);
             });
 
             base.SetUpSteps();

@@ -70,6 +70,7 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Highway
                 convert = false;
                 highwayConfig.SetValue(HighwaySetting.Preset, HighwayPreset.Custom);
                 highwayConfig.SetValue(HighwaySetting.Preset, HighwayPreset.Chunithm);
+                highwayConfig.SetValue(HighwaySetting.Wall, 0f); // a game with a wall leaves it to the player
                 highwayConfig.SetValue(HighwaySetting.Track, HighwayTrackStyle.Highway);
                 highwayConfig.GetBindable<float>(HighwaySetting.TrackOpacity).SetDefault();
                 highwayConfig.GetBindable<KeyBeamLength>(HighwaySetting.KeyBeam).SetDefault();

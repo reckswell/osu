@@ -54,6 +54,7 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Highway
                 autoplay = true;
                 highwayConfig.SetValue(HighwaySetting.Preset, HighwayPreset.Custom);
                 highwayConfig.SetValue(HighwaySetting.Preset, HighwayPreset.Chunithm);
+                highwayConfig.SetValue(HighwaySetting.Wall, 0f); // a game with a wall leaves it to the player
                 highwayConfig.SetValue(HighwaySetting.HitEffects, HighwayHitEffectStyle.Highway);
             });
 
