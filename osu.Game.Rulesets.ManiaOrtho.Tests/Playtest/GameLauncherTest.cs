@@ -25,7 +25,7 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Playtest
         {
             // A space and a "!" as in Documents\Projects\osu!.
             root = Path.Combine(Path.GetTempPath(), $"ortho-launcher-{Guid.NewGuid():N}", "osu! projects");
-            layout = new PackageLayout(Path.Combine(root, "osu"), Path.Combine(root, PackageLayout.DATA_FOLDER), Path.Combine(root, "stable"));
+            layout = new PackageLayout(Path.Combine(root, "osu"), Path.Combine(root, PackageLayout.DATA_FOLDER));
             Directory.CreateDirectory(layout.Game);
         }
 
@@ -44,7 +44,19 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Playtest
             Assert.That(found.Data, Is.EqualTo(Path.Combine(root, "ortho-data")));
             Assert.That(found.GameExecutable, Is.EqualTo(Path.Combine(root, "osu", "game", "osu!.exe")));
             Assert.That(found.Temp, Is.EqualTo(Path.Combine(root, "osu", "temp")));
-            Assert.That(found.Stable, Does.EndWith("osu!"));
+        }
+
+        /// <summary>
+        /// Everything the launcher names is inside the folder that holds the package (Documents\Projects\osu!): nothing goes
+        /// into an osu! install (Alpha 2026-11-08).
+        /// </summary>
+        [Test]
+        public void TestEverythingStaysInTheProjectFolder()
+        {
+            var found = PackageLayout.ForPackage(Path.Combine(root, "osu"));
+
+            foreach (string path in new[] { found.Package, found.Game, found.GameExecutable, found.Data, found.Temp, found.Log })
+                Assert.That(path, Does.StartWith(root + Path.DirectorySeparatorChar), path);
         }
 
         [Test]
@@ -63,6 +75,9 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Playtest
 
                 Assert.That(storage.Error, Is.EqualTo(OsuStorageError.None));
                 Assert.That(storage.GetFullPath("."), Is.SamePath(layout.Data));
+
+                // osu!'s screenshots (ScreenshotManager) stay in the data folder.
+                Assert.That(storage.GetStorageForDirectory("screenshots").GetFullPath("."), Is.SamePath(Path.Combine(layout.Data, "screenshots")));
             }
         }
 
@@ -78,34 +93,6 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Playtest
 
             Assert.That(File.ReadAllText(Path.Combine(layout.Game, "framework.ini")), Is.EqualTo("WindowMode = Fullscreen\r\n"));
             Assert.That(File.ReadAllText(Path.Combine(layout.Data, GameLauncher.DATA_NOTE)), Is.EqualTo("mine"));
-        }
-
-        [Test]
-        public void TestScreenshotsMoveToStableWithoutReplacingAny()
-        {
-            string from = Directory.CreateDirectory(Path.Combine(layout.Data, "screenshots")).FullName;
-            string to = Directory.CreateDirectory(Path.Combine(layout.Stable, "Screenshots")).FullName;
-
-            File.WriteAllText(Path.Combine(from, "osu_2026-11-04_05-00-00.png"), "new");
-            File.WriteAllText(Path.Combine(from, "same-name.png"), "ours");
-            File.WriteAllText(Path.Combine(to, "same-name.png"), "stable's");
-
-            Assert.That(GameLauncher.MoveScreenshots(layout), Is.EqualTo(1));
-
-            Assert.That(File.ReadAllText(Path.Combine(to, "osu_2026-11-04_05-00-00.png")), Is.EqualTo("new"));
-            Assert.That(File.Exists(Path.Combine(from, "osu_2026-11-04_05-00-00.png")), Is.False);
-            Assert.That(File.ReadAllText(Path.Combine(to, "same-name.png")), Is.EqualTo("stable's"));
-            Assert.That(File.ReadAllText(Path.Combine(from, "same-name.png")), Is.EqualTo("ours"));
-        }
-
-        [Test]
-        public void TestScreenshotsStayWithoutStable()
-        {
-            string from = Directory.CreateDirectory(Path.Combine(layout.Data, "screenshots")).FullName;
-            File.WriteAllText(Path.Combine(from, "shot.png"), "new");
-
-            Assert.That(GameLauncher.MoveScreenshots(layout), Is.Zero);
-            Assert.That(File.Exists(Path.Combine(from, "shot.png")), Is.True);
         }
 
         [Test]

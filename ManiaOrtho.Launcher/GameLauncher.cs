@@ -9,8 +9,9 @@ namespace ManiaOrtho.Launcher
 {
     /// <summary>
     /// What <c>osu.exe</c> does around the packaged game, as <c>scripts/ortho/play.ps1</c> does around the clone's build:
-    /// it keeps the game's data in <see cref="PackageLayout.Data"/> and its temporary files in the package, and moves
-    /// screenshots into osu!stable's folder after each run. See docs/ortho/PLAYTESTING.md, "L4".
+    /// it keeps the game's data (screenshots included) in <see cref="PackageLayout.Data"/> and its temporary files in the
+    /// package. Nothing is written to an osu! install: osu!stable's files are only read, by osu!'s own import (Alpha
+    /// 2026-11-08). See docs/ortho/PLAYTESTING.md, "L4".
     /// </summary>
     public static class GameLauncher
     {
@@ -50,39 +51,10 @@ namespace ManiaOrtho.Launcher
 
             if (!File.Exists(note))
             {
-                File.WriteAllText(note, "Data of the maniaortho build of osu! (osu.exe, or scripts\\ortho\\play.ps1 in the clone).\r\n"
-                                        + "Imported maps and skins here are hard links to osu!stable's files: deleting this folder frees no space "
-                                        + "and leaves stable's files as they are.\r\n");
+                File.WriteAllText(note, "Data of the maniaortho build of osu! (osu.exe, or scripts\\ortho\\play.ps1 in the clone), screenshots "
+                                        + "included.\r\nImported maps and skins here are hard links to osu!stable's files, which are only read: "
+                                        + "deleting this folder frees no space and leaves stable's files as they are.\r\n");
             }
-        }
-
-        /// <summary>
-        /// Moves screenshots from the data folder into osu!stable's Screenshots folder, never replacing a file there.
-        /// Moved rather than linked: a junction to stable's folder would be followed by tools that delete recursively.
-        /// </summary>
-        /// <returns>How many were moved. Nothing moves when either folder is missing.</returns>
-        public static int MoveScreenshots(PackageLayout layout)
-        {
-            string from = Path.Combine(layout.Data, "screenshots");
-            string to = Path.Combine(layout.Stable, "Screenshots");
-
-            if (!Directory.Exists(from) || !Directory.Exists(to))
-                return 0;
-
-            int moved = 0;
-
-            foreach (string file in Directory.GetFiles(from))
-            {
-                string target = Path.Combine(to, Path.GetFileName(file));
-
-                if (File.Exists(target))
-                    continue;
-
-                File.Move(file, target);
-                moved++;
-            }
-
-            return moved;
         }
 
         /// <summary>
@@ -130,7 +102,7 @@ namespace ManiaOrtho.Launcher
         }
 
         /// <summary>
-        /// Prepares the folders, starts the game and waits for it to close, then moves its screenshots.
+        /// Prepares the folders, starts the game and waits for it to close.
         /// </summary>
         /// <returns>The game's exit code, or 0 when it was already running.</returns>
         public static int Run(PackageLayout layout, Action<string> log)
@@ -148,18 +120,12 @@ namespace ManiaOrtho.Launcher
             PrepareGame(layout);
             Directory.CreateDirectory(layout.Temp);
 
-            int leftOver = MoveScreenshots(layout);
-            if (leftOver > 0)
-                log($"moved {leftOver} screenshot(s) left from an earlier run to {layout.Stable}");
-
             log($"starting {layout.GameExecutable} (data: {layout.Data})");
 
             using (var game = Process.Start(CreateStartInfo(layout)) ?? throw new InvalidOperationException($"Could not start {layout.GameExecutable}."))
             {
                 game.WaitForExit();
-
-                int moved = MoveScreenshots(layout);
-                log($"closed with code {game.ExitCode}; moved {moved} screenshot(s)");
+                log($"closed with code {game.ExitCode}");
 
                 return game.ExitCode;
             }

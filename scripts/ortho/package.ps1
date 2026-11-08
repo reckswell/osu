@@ -1,9 +1,9 @@
-# Packages the full game with maniaortho for playing: double-click osu.exe.
+﻿# Packages the full game with maniaortho for playing: double-click osu.exe.
 #   powershell -ExecutionPolicy Bypass -File scripts\ortho\package.ps1
 #
 # Layout, next to the clone (Documents\Projects\osu!):
-#   osu\osu.exe     the launcher (ManiaOrtho.Launcher): keeps the data in ortho-data and temp files in osu\temp, moves
-#                   screenshots into osu!stable's Screenshots folder after each run
+#   osu\osu.exe     the launcher (ManiaOrtho.Launcher): keeps the data (screenshots included) in ortho-data and temp
+#                   files in osu\temp; nothing is written to an osu! install (Alpha 2026-11-08)
 #   osu\game\       the game (osu.Desktop, Debug: it only knows osu!'s development server)
 #   ortho-data\     the game's data, shared with scripts\ortho\play.ps1; kept when packaging again
 # Run it again after pulling changes; the game must be closed. See docs/ortho/PLAYTESTING.md, "L4".

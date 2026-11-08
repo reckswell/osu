@@ -115,7 +115,7 @@ powershell -ExecutionPolicy Bypass -File scripts\ortho\play.ps1          # for d
 ```
 
 `osu.exe` (`ManiaOrtho.Launcher`) does for the package what `play.ps1` does for the clone's build: the ini files,
-temp files in `osu\temp`, no update checks or crash reports, screenshots moved to stable, and `osu\launcher.log`. It
+temp files in `osu\temp`, no update checks or crash reports, screenshots kept in the data, and `osu\launcher.log`. It
 starts nothing when the packaged game is already running. `osu\version.txt` names the commit it was packaged from.
 
 - **Data**: `Documents\Projects\osu!\ortho-data`, next to the clone, so a fresh clone or `git clean` keeps it. The
@@ -128,9 +128,9 @@ starts nothing when the packaged game is already running. `osu\version.txt` name
   "Import from osu!stable" again (already imported maps are skipped). Dragging an `.osz` onto the window also works but
   keeps a separate copy. Lazer's in-game beatmap listing does not need supporter (in the client only the listing's
   "played" and "rank achieved" filters do), but it needs a login to osu!'s servers, which this build does not use.
-- **Screenshots** land in `ortho-data\screenshots` and the script moves them into stable's `Screenshots` folder when
-  the game closes (and at the next start). Moved, not linked: PowerShell 5.1's `Remove-Item -Recurse` follows a
-  junction and would empty stable's folder, and osu!'s own "move data folder" would copy all of it.
+- **Screenshots** stay in `ortho-data\screenshots` (Alpha 2026-11-08: nothing is written into an osu! install). osu!'s
+  "screenshot saved" notification opens them. `play.ps1` warns if stable's folder, its `Screenshots` or
+  `%APPDATA%\osu-development` changed during a run.
 - **Servers**: the Debug build only knows osu!'s development server (dev.ppy.sh); Alpha should not log in. Like every
   lazer it downloads osu!'s public beatmap metadata file (`online.db`, about 86 MB) and the main menu's news banner
   from assets.ppy.sh. Discord rich presence connects but shows nothing while logged out. No update

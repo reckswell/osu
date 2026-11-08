@@ -1286,3 +1286,17 @@ alternatives considered, how to reverse. If a later decision overrides one, add 
 - **Left as is** (gameplay-reviewer): the first frame after loading has no measured lanes and assumes equal ones (argon
   7K: one frame at 7 lane widths, then 8), during the intro.
 - **Reverse**: "Width by" Track.
+
+## 2026-11-08: Nothing written into an osu! install (Alpha)
+
+- **Alpha**: "make sure everything stays local into the patcher, this entire mod should not modify the actual osu
+  installation whatsoever". Overrides the 2026-11-04 entry's "Screenshots go to stable's `Screenshots` folder".
+- **Decision**: screenshots stay in `ortho-data\screenshots`; the launcher (`osu.exe`) and `play.ps1` no longer move
+  them and no longer know stable's path. `GameLauncherTest.TestEverythingStaysInTheProjectFolder` pins every path the
+  launcher names inside the folder that holds the package. `play.ps1` warns when stable's folder, its `Screenshots` or
+  `%APPDATA%\osu-development` changes during a run. CLAUDE.md's "Never" list carries the rule.
+- **Checked**: nothing else of ours writes outside `Documents\Projects\osu!` (temp files and build caches are in the
+  package and `.ortho-cache`; file associations are only registered by the Velopack installer, which a package-managed
+  build skips). osu!'s own "Import from osu!stable" still hard-links stable's files (their contents never change) and, in
+  its first-run screen, writes and deletes an empty `_hard_link_test` file in stable's `Songs` folder to see whether
+  links work: asked Alpha whether to keep that or patch osu! to copy instead.

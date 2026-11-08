@@ -1,27 +1,23 @@
-# Runs the full osu! game (menus, song select, settings, replays) with maniaortho, built from this clone.
+﻿# Runs the full osu! game (menus, song select, settings, replays) with maniaortho, built from this clone.
 #   powershell -ExecutionPolicy Bypass -File scripts\ortho\play.ps1
 #   powershell -ExecutionPolicy Bypass -File scripts\ortho\play.ps1 -NoBuild
 #
-# What it writes stays inside the folder that holds the clone (Documents\Projects\osu!):
-#   - the game's data (database, settings, imported maps and skins, replays, logs) in ..\ortho-data, next to the clone;
+# What it writes stays inside the folder that holds the clone (Documents\Projects\osu!); nothing is written to an osu!
+# install (Alpha 2026-11-08):
+#   - the game's data (database, settings, imported maps and skins, replays, screenshots, logs) in ..\ortho-data, next to
+#     the clone;
 #   - framework.ini and storage.ini next to the build: the first makes the game portable, so it never opens
 #     %APPDATA%\osu (the release game's data) or %APPDATA%\osu-development; the second is osu!'s own "custom data
 #     location" setting, pointing at ..\ortho-data;
 #   - build caches and temp files in .ortho-cache (windows-env.ps1).
-# osu!stable's files are used where they can be:
-#   - maps, skins, scores and collections: osu!'s first-run "Import from osu!stable" (later: Settings > Maintenance).
-#     On the same drive it creates hard links: no copies, no extra space, stable's files left as they are;
-#   - screenshots: taken into ..\ortho-data\screenshots, then moved into stable's Screenshots folder when the game
-#     closes (and at the next start, for any left over). A move never replaces a file that is already there.
+# osu!stable's files are only read: maps, skins, scores and collections through osu!'s first-run "Import from osu!stable"
+# (later: Settings > Maintenance). On the same drive it creates hard links in ..\ortho-data: no copies, no extra space,
+# stable's files left as they are.
 # The Debug build talks only to osu!'s development server (dev.ppy.sh), never to osu.ppy.sh. Do not log in.
 param(
     # Where the game keeps its data. Default: ortho-data next to the clone.
     [string]$Data,
-    # osu!stable's install, where screenshots go.
-    [string]$Stable = (Join-Path $env:LOCALAPPDATA "osu!"),
     [switch]$NoBuild,
-    # Leave screenshots in the data folder.
-    [switch]$KeepScreenshots,
     # For checks: ask the game to close after this many seconds.
     [int]$QuitAfter = 0
 )
@@ -66,29 +62,21 @@ New-Item -ItemType Directory -Force -Path $Data | Out-Null
 # osu! asks what to do with an empty custom data folder on its first start; a note in it skips the question.
 $note = Join-Path $Data "ortho-data.txt"
 if (-not (Test-Path -LiteralPath $note)) {
-    [IO.File]::WriteAllText($note, "Data of the maniaortho development build (scripts\ortho\play.ps1 in the clone).`r`n" +
-        "Imported maps and skins here are hard links to osu!stable's files: deleting this folder frees no space and leaves stable's files as they are.`r`n")
+    [IO.File]::WriteAllText($note, "Data of the maniaortho development build (scripts\ortho\play.ps1 in the clone), screenshots included.`r`n" +
+        "Imported maps and skins here are hard links to osu!stable's files, which are only read: deleting this folder frees no space and leaves stable's files as they are.`r`n")
 }
 
-function Move-Screenshots {
-    $from = Join-Path $Data "screenshots"
-    $to = Join-Path $Stable "Screenshots"
-    if ($KeepScreenshots -or -not (Test-Path -LiteralPath $from) -or -not (Test-Path -LiteralPath $to)) { return }
-    $moved = 0
-    foreach ($file in Get-ChildItem -LiteralPath $from -File) {
-        $target = Join-Path $to $file.Name
-        if (Test-Path -LiteralPath $target) { Write-Host "   kept $($file.Name): stable already has a file of that name"; continue }
-        Move-Item -LiteralPath $file.FullName -Destination $target
-        $moved++
-    }
-    if ($moved -gt 0) { Write-Host "== moved $moved screenshot(s) to $to" }
-}
+# The game must never write to these (only checked for existence and time, never opened): osu!'s development data (where
+# a build that is not portable would go), and osu!stable's install with its screenshots. A change during the run is
+# reported (stable running at the same time also changes them).
+$watched = @(
+    (Join-Path $env:APPDATA "osu-development"),
+    (Join-Path $env:LOCALAPPDATA "osu!"),
+    (Join-Path $env:LOCALAPPDATA "osu!\Screenshots")
+)
+function Get-WatchedTimes { foreach ($path in $watched) { if (Test-Path -LiteralPath $path) { (Get-Item -LiteralPath $path).LastWriteTimeUtc.Ticks } else { -1 } } }
+$watchedBefore = @(Get-WatchedTimes)
 
-# The game must never touch these (only checked for existence and time, never opened).
-$devData = Join-Path $env:APPDATA "osu-development"
-$devDataBefore = if (Test-Path -LiteralPath $devData) { (Get-Item -LiteralPath $devData).LastWriteTimeUtc } else { $null }
-
-Move-Screenshots
 Write-Host "== osu! (data: $Data)"
 $game = Start-Process -FilePath $exe -WorkingDirectory $bin -PassThru
 if ($QuitAfter -gt 0) {
@@ -102,8 +90,11 @@ if ($QuitAfter -gt 0) {
     }
 }
 $game.WaitForExit()
-Move-Screenshots
 
-$devDataAfter = if (Test-Path -LiteralPath $devData) { (Get-Item -LiteralPath $devData).LastWriteTimeUtc } else { $null }
-if ($devDataAfter -ne $devDataBefore) { Write-Host "WARNING: $devData changed during the run; the build was not portable" ; exit 1 }
+$watchedAfter = @(Get-WatchedTimes)
+$changed = $false
+for ($i = 0; $i -lt $watched.Count; $i++) {
+    if ($watchedAfter[$i] -ne $watchedBefore[$i]) { Write-Host "WARNING: $($watched[$i]) changed during the run"; $changed = $true }
+}
+if ($changed) { exit 1 }
 Write-Host "== closed; logs in $(Join-Path $Data 'logs')"

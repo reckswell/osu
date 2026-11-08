@@ -111,8 +111,9 @@ Status: `[ ]` open, `[~]` in progress (one at a time), `[x]` done, `[!]` blocked
   changed to ...\ortho-data", no `%APPDATA%\osu-development`, stable's top level unchanged, nothing sent to
   osu.ppy.sh; `-QuitAfter` needed a second close request, fixed.)
 - [ ] Alpha's files from stable: osu!'s first-run import of maps, skins and scores from `AppData\Local\osu!` by hard
-  links; screenshots moved into stable's `Screenshots` folder; never open `%APPDATA%\osu`. Gate: on Alpha's PC the
-  import reports hard links, stable's files unchanged (sizes and times), a screenshot lands in stable's folder.
+  links; screenshots stay in `ortho-data\screenshots` (Alpha 2026-11-08: nothing written into an osu! install); never
+  open `%APPDATA%\osu`. Gate: on Alpha's PC the import reports hard links, stable's files unchanged (sizes and times),
+  a screenshot lands in `ortho-data\screenshots`.
 - [x] Package for Alpha (asked 2026-11-04): `osu\osu.exe` next to the clone starts the packaged game, repackaged with
   `scripts/ortho/package.ps1`. Gate: `GameLauncherTest`; on Alpha's PC the package builds and `osu.exe` starts the game
   with its data in `ortho-data`. (PC 2026-11-04: packaged in 24 s, game 354 files / 651 MB, osu.exe 186 KB; started

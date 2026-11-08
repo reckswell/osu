@@ -84,7 +84,9 @@ user-visible features.
 
 **Never**: push to `master`, force-push shared branches, disable or skip tests to get green, commit beatmaps, audio or
 skins you did not create (copyright), copy code from non-MIT/BSD sources into this repo (reading for reference is fine;
-note the licence in the research note).
+note the licence in the research note), write anything into an osu! install or osu!'s own data (`AppData\Local\osu!`,
+`%APPDATA%\osu`): the patcher keeps everything it writes in `Documents\Projects\osu!` and only reads stable's files
+(Alpha, 2026-11-08).
 
 ## Gotchas learned so far
 
