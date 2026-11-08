@@ -72,6 +72,7 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Highway
                 chart = "synthetic-4k";
                 beatmap = null;
                 highwayConfig.GetBindable<HighwayNoteStyle>(HighwaySetting.NoteStyle).SetDefault();
+                highwayConfig.ForgetGames(); // each game remembers its settings; start from its own
                 highwayConfig.SetValue(HighwaySetting.Preset, HighwayPreset.Custom);
                 highwayConfig.SetValue(HighwaySetting.Preset, HighwayPreset.Chunithm);
                 highwayConfig.SetValue(HighwaySetting.Wall, 0f); // a game with a wall leaves it to the player

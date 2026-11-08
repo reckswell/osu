@@ -1433,3 +1433,40 @@ screen terms"), as that entry allowed.
 - **Side effects**: the default camera (`HighwaySettings()`) follows; "Kiai lift" now lifts Chunithm's lane too (still
   off by default); with the same length, a tilt of 46° or less brings the lane back to the top edge.
 - **Reverse**: `LaneTilt = 47.5f, LaneLength = 3.72f` in the Chunithm preset.
+
+## 2026-11-08: Settings by game, and each game remembers its own (Alpha)
+
+- **Ask**: "the first header should be "settings: orthomania" for orthomania specific settings / then it should have
+  "game preset: sdvx, chunithm, pjsk, etc." and then under there should be things like scroll speed, lane angle, etc. /
+  and change the settings that appear dependent upon game (eg sdvx should have wall = 0, chunithm should have a saved
+  wall preset depending on what the previous option was) / also add an option within the settings menu to change the
+  notes / generally organize all of the orthomania settings between gameplay, and other settings, so that its not a
+  long list of things to scroll through".
+- **Panel**: "Settings: orthomania" (Gameplay: Notes, Hold opacity, Timing-based colouring, Lane guides, Far fade, Key
+  beam, Hit effects, Use skin hit target; Other settings: track and motion, skin layout, input), then "Game preset" (the
+  game, then Speed, Lane and camera, Lane and note size, Wall). Groups fold by clicking their heading
+  (`OrthoSettingsGroup`), Other settings folded on a new install, and stay as left (`FoldedGroups`, panel state only).
+  Search shows matches inside folded groups; a match on a group's name shows the whole group. The section heading over
+  everything stays osu!'s ruleset name ("mania (ortho)"): renaming the ruleset is branding (Ask Alpha), so only the first
+  heading inside it says orthomania, as asked.
+- **"An option to change the notes"**: read as the existing "Notes" choice (Skin ported / Skin warped / Highway), which
+  sat near the bottom of the old list Alpha was looking at; it is now the first setting. If Alpha meant new note
+  designs, that is a separate feature.
+- **Memory** (my reading of "settings that appear dependent upon game"): each game remembers every setting under Game
+  preset, not just the wall. The look and numbers (camera, lane tilt, length, approach, judgement line, width mode,
+  track width, lane width, note thickness, speed and wall scales) are stored only as the player's changes over the
+  game's own values, so tuning a game in code still reaches values left alone, and each setting's default (its reset
+  button) is the current game's value. The speed, the wall and "Wall keeps visible time" have no game value: a game
+  chosen for the first time starts from the ones in use, then keeps its own. Custom keeps all of its values. One string
+  setting (`GameMemory`, `Chunithm:Wall=0.3,...;Voltex:...`), written whenever one of these changes.
+- **Changed from before**: editing the look no longer turns the preset into Custom (that discarded the game's
+  identity; now the game keeps the change and its reset brings the game's value back). A game without a wall keeps it at
+  0: the config puts it back and the wall keys do nothing there (it used to switch to Custom).
+- **Upgrade**: once (`GameMemoryStarted`), the game in use keeps the player's wall, speed and, if they had been shown
+  already, numbers; its look was the game's own (or it would have been Custom, which keeps everything). The one-time
+  steps that move an install to Custom (width by lane, old far edge cameras) record Custom's values as they do it.
+- **Tests**: `TestEachGameRemembersItsSettings`, `TestWallInAGamesPreset`, `TestGameMemoryStartsFromAnInstallBefore`,
+  `TestSettingsPanel`, `TestSettingsFold`; test scenes and the playtest harness forget the games' memory in their set-up
+  so a preset is its own look.
+- **Reverse**: drop `GameMemory` handling in `HighwayConfigManager` (look edits back to Custom via a `matches` check, as
+  in 523188e) and put the flat list back in `ManiaOrthoSettingsSubsection`.

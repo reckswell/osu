@@ -161,6 +161,7 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Parity
             // A case that changes the camera must not leave it changed for the next one, even when it fails.
             AddStep("default preset", () =>
             {
+                orthoConfig.Highway.ForgetGames(); // each game remembers its settings; start from its own
                 orthoConfig.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Custom);
                 orthoConfig.Highway.SetValue(HighwaySetting.Preset, HighwayPresets.DEFAULT);
                 orthoConfig.Highway.SetValue(HighwaySetting.Track, HighwayTrackStyle.Highway);

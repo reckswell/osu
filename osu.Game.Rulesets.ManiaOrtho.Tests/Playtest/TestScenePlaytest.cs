@@ -178,6 +178,7 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Playtest
                     ortho.Highway.SetValue(HighwaySetting.Wall, 0f);
 
                     // Set the preset twice so its values are re-applied even if it is already selected.
+                    ortho.Highway.ForgetGames(); // each game remembers its settings; start from its own
                     ortho.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Custom);
                     ortho.Highway.SetValue(HighwaySetting.Preset, options.Preset);
 

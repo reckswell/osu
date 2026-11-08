@@ -51,9 +51,16 @@ Requirements:
   narrow far end), **Project Sekai** (high line, very narrow far end). Straight-on: **beatmania IIDX**, **DJMAX**,
   **Quaver**, **StepMania**. **osu!mania** is mania's own stage (flat); **Parallel tilt** a neutral parallel camera.
   Games without a wall or lane cover (SDVX, Project Sekai, DJMAX, osu!mania) have none: the wall is down and its
-  settings hidden. Changing the look by hand makes the preset Custom; the speed, the wall in a game with one, and the
-  numbers they are shown in stay as the player sets them. Values come from the research notes and are recorded in
+  settings hidden. Each game remembers everything under "Game preset" as the player leaves it (Alpha, 2026-11-08: "sdvx
+  should have wall = 0, chunithm should have a saved wall preset depending on what the previous option was"): its look
+  and numbers as changes on top of the game's own values (a setting's reset goes back to the game's), and the player's
+  speed, wall and whether the wall keeps the visible time; a game chosen for the first time starts from the speed and
+  wall in use. Custom keeps all of its own values. Values come from the research notes and are recorded in
   `DECISIONS.md`.
+- **Settings panel** (Alpha, 2026-11-08): under the ruleset's heading, "Settings: orthomania" first (Gameplay: notes
+  first; Other settings: track and motion, skin layout, input, folded by default), then "Game preset" (the game, then
+  Speed, Lane and camera, Lane and note size, Wall). Each group folds and stays as left; searching finds settings in
+  folded groups.
 - No camera motion driven by beatmap data. Optional cosmetic motion is allowed, off by default, and must never move the
   judgement line: **kiai sway** (the far end swings with the beat) and **kiai lift** (the lane pitches up towards the top
   of the screen over three beats, as SDVX's charts do at a chorus, with the notes' speed at the line kept;

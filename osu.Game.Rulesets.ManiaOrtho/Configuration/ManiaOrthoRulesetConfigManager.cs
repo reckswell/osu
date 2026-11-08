@@ -2,6 +2,8 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using osu.Framework.Bindables;
 using osu.Framework.Configuration.Tracking;
 using osu.Game.Configuration;
@@ -31,6 +33,9 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
             Highway = new HighwayConfigManager(settings, ruleset, variant);
 
             keepFineScrollSpeed();
+
+            // Each game remembers its own speed (Alpha 2026-11-08), as it remembers the rest of its settings.
+            Highway.RememberScrollSpeed(GetOriginalBindable<double>(ManiaRulesetSetting.ScrollSpeed));
 
             // The camera defines the direction (SPEC 3): notes always come down the track, whatever was stored.
             SetValue(ManiaRulesetSetting.ScrollDirection, ManiaScrollingDirection.Down);
@@ -92,40 +97,68 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
     {
         private bool applyingPreset;
 
+        private readonly Bindable<HighwayPreset> preset;
+
+        /// <summary>
+        /// What each game remembers (<see cref="HighwaySetting.GameMemory"/>), read again whenever the stored string changes.
+        /// </summary>
+        private readonly Bindable<string> storedMemory;
+
+        private GameMemory memory;
+
+        /// <summary>
+        /// osu!mania's scroll speed, which each game remembers too once <see cref="RememberScrollSpeed"/> gives it.
+        /// </summary>
+        private Bindable<double>? scrollSpeed;
+
+        private const string scroll_speed_key = "ScrollSpeed";
+
+        /// <summary>
+        /// The settings under "Game preset", which each game remembers (Alpha 2026-11-08). The game's look and numbers start at
+        /// the game's own values and keep the player's changes on top; the wall, whether it keeps the visible time and the
+        /// speed (<see cref="RememberScrollSpeed"/>) are the player's alone: a game chosen for the first time starts from the
+        /// current ones. A game without a wall (<see cref="HighwayPresets.HasWall"/>) keeps the wall down and remembers none
+        /// of the wall's settings.
+        /// </summary>
+        private static readonly GameSetting[] game_settings =
+        {
+            new GameSetting<HighwayCameraMode>(HighwaySetting.CameraMode, g => g.CameraMode),
+            new GameSetting<float>(HighwaySetting.LaneTilt, g => g.LaneTilt),
+            new GameSetting<float>(HighwaySetting.LaneLength, g => g.LaneLength),
+            new GameSetting<float>(HighwaySetting.Approach, g => g.Approach),
+            new GameSetting<float>(HighwaySetting.JudgementLineHeight, g => g.JudgementLineHeight),
+            new GameSetting<HighwayWidthMode>(HighwaySetting.WidthMode, g => g.WidthMode),
+            new GameSetting<float>(HighwaySetting.TrackWidth, g => g.TrackWidth),
+            new GameSetting<float>(HighwaySetting.LaneWidth, g => g.LaneWidth),
+            new GameSetting<float>(HighwaySetting.NoteThickness, g => g.NoteThickness),
+            new GameSetting<SpeedScale>(HighwaySetting.SpeedScale, g => g.SpeedScale),
+            new GameSetting<WallScale>(HighwaySetting.WallScale, g => g.WallScale, true),
+            new GameSetting<float>(HighwaySetting.Wall, null, true),
+            new GameSetting<bool>(HighwaySetting.WallKeepsVisibleTime, null, true),
+        };
+
         public HighwayConfigManager(SettingsStore? settings, RulesetInfo ruleset, int? variant = null)
             : base(settings, ruleset, variant)
         {
-            var preset = GetOriginalBindable<HighwayPreset>(HighwaySetting.Preset);
+            preset = GetOriginalBindable<HighwayPreset>(HighwaySetting.Preset);
+            storedMemory = GetOriginalBindable<string>(HighwaySetting.GameMemory);
+            memory = GameMemory.Parse(storedMemory.Value);
+            storedMemory.ValueChanged += e => memory = GameMemory.Parse(e.NewValue);
 
-            keepWidthByLane(preset);
+            keepWidthByLane();
+            keepCustomCameraAsTilt();
+            ApplySkinPortDefaults();
+            applySkinLayoutDefault();
+            startGameMemoryOnce();
 
-            // A named preset always shows its current values, so tuning a preset in code reaches everyone using it. Its
-            // game's numbers (speed and wall scales) are set when it is chosen, and stay as the player leaves them.
-            ApplyPreset(preset.Value);
+            // A game always shows its own values under the player's changes, so tuning a game in code reaches everyone who
+            // left that value alone.
+            applyGame(preset.Value, false);
 
-            preset.ValueChanged += e =>
-            {
-                ApplyPreset(e.NewValue);
-                ApplyPresetScales(e.NewValue);
-            };
+            preset.ValueChanged += e => switchGame(e.OldValue, e.NewValue);
 
-            // Changing any value by hand turns the preset into "Custom".
-            GetOriginalBindable<HighwayCameraMode>(HighwaySetting.CameraMode).ValueChanged += _ => onPresetValueChanged();
-            GetOriginalBindable<float>(HighwaySetting.LaneTilt).ValueChanged += _ => onPresetValueChanged();
-            GetOriginalBindable<float>(HighwaySetting.LaneLength).ValueChanged += _ => onPresetValueChanged();
-            GetOriginalBindable<float>(HighwaySetting.Approach).ValueChanged += _ => onPresetValueChanged();
-            GetOriginalBindable<float>(HighwaySetting.JudgementLineHeight).ValueChanged += _ => onPresetValueChanged();
-            GetOriginalBindable<float>(HighwaySetting.TrackWidth).ValueChanged += _ => onPresetValueChanged();
-            GetOriginalBindable<float>(HighwaySetting.Wall).ValueChanged += _ => onPresetValueChanged();
-            GetOriginalBindable<float>(HighwaySetting.NoteThickness).ValueChanged += _ => onPresetValueChanged();
-            GetOriginalBindable<HighwayWidthMode>(HighwaySetting.WidthMode).ValueChanged += _ => onPresetValueChanged();
-            GetOriginalBindable<float>(HighwaySetting.LaneWidth).ValueChanged += _ => onPresetValueChanged();
-
-            void onPresetValueChanged()
-            {
-                if (!applyingPreset && preset.Value != HighwayPreset.Custom && !matches(preset.Value))
-                    preset.Value = HighwayPreset.Custom;
-            }
+            foreach (var setting in game_settings)
+                setting.Watch(this, onGameSettingChanged);
 
             // Choosing a game's wall scale also gives the wall that game's speed behaviour (Chunithm and osu!mania keep the
             // speed, IIDX the visible time); the toggle can still be changed afterwards.
@@ -134,11 +167,189 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
                 if (!applyingPreset && WallScales.KeepsVisibleTime(e.NewValue) is bool keepsVisibleTime)
                     SetValue(HighwaySetting.WallKeepsVisibleTime, keepsVisibleTime);
             };
+        }
 
-            ApplySkinPortDefaults();
-            applySkinLayoutDefault();
-            applyPresetScalesOnce();
-            keepCustomCameraAsTilt();
+        /// <summary>
+        /// Makes each game remember osu!mania's scroll speed too (<see cref="ManiaOrthoRulesetConfigManager"/> owns it). The
+        /// game in use keeps the speed it has now, if it remembers none yet.
+        /// </summary>
+        public void RememberScrollSpeed(Bindable<double> speed)
+        {
+            scrollSpeed = speed;
+            speed.ValueChanged += _ => onGameSettingChanged();
+
+            if (memory.Get(preset.Value, scroll_speed_key) == null)
+                rememberAll(preset.Value);
+        }
+
+        /// <summary>
+        /// Forgets what every game remembers, and shows the current game's own values again; the speed and the wall stay.
+        /// </summary>
+        public void ForgetGames()
+        {
+            storedMemory.Value = string.Empty;
+            applyGame(preset.Value, false);
+            rememberAll(preset.Value);
+        }
+
+        /// <summary>
+        /// Whether the current game remembers a change of the player's to its look or numbers (not the speed or the wall).
+        /// </summary>
+        public bool GameChanged
+        {
+            get
+            {
+                var game = preset.Value;
+
+                if (game == HighwayPreset.Custom)
+                    return false;
+
+                foreach (var setting in game_settings)
+                {
+                    if (!setting.IsPlayers && memory.Get(game, setting.Key) != null)
+                        return true;
+                }
+
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Leaving <paramref name="from"/>: it keeps what it has, so choosing it again brings it back. <paramref name="to"/>
+        /// shows its own values and what it remembers; chosen for the first time, it starts from the current speed and wall.
+        /// </summary>
+        private void switchGame(HighwayPreset from, HighwayPreset to)
+        {
+            rememberAll(from);
+            applyGame(to, true);
+            rememberAll(to);
+        }
+
+        /// <summary>
+        /// Shows <paramref name="game"/>'s values with what it remembers on top: its look and numbers always, the player's
+        /// wall and speed when <paramref name="restorePlayers"/> (on load they are the stored ones already). Custom has no values
+        /// of its own: it shows what it remembers and keeps the rest. Each setting's reset goes back to the game's value
+        /// (Custom: the default game's).
+        /// </summary>
+        private void applyGame(HighwayPreset game, bool restorePlayers)
+        {
+            bool wasApplying = applyingPreset;
+            applyingPreset = true;
+
+            try
+            {
+                var values = HighwayPresets.Get(game == HighwayPreset.Custom ? HighwayPresets.DEFAULT : game);
+                bool hasWall = HighwayPresets.HasWall(game);
+
+                foreach (var setting in game_settings)
+                {
+                    if (setting.IsWall && !hasWall)
+                        continue;
+
+                    setting.UseDefault(this, values);
+
+                    string? remembered = memory.Get(game, setting.Key);
+
+                    if (remembered != null && (restorePlayers || !setting.IsPlayers))
+                        setting.Write(this, remembered);
+                    else if (game != HighwayPreset.Custom)
+                        setting.UseGames(this, values);
+                }
+
+                if (!hasWall)
+                    SetValue(HighwaySetting.Wall, 0f);
+
+                if (restorePlayers && scrollSpeed != null
+                                   && double.TryParse(memory.Get(game, scroll_speed_key), NumberStyles.Float, CultureInfo.InvariantCulture, out double speed))
+                    scrollSpeed.Value = speed;
+            }
+            finally
+            {
+                applyingPreset = wasApplying;
+            }
+        }
+
+        private void onGameSettingChanged()
+        {
+            if (applyingPreset)
+                return;
+
+            var game = preset.Value;
+
+            // A game without a wall keeps it down (Alpha 2026-11-08: "sdvx should have wall = 0").
+            if (!HighwayPresets.HasWall(game) && Get<float>(HighwaySetting.Wall) != 0)
+            {
+                applyingPreset = true;
+
+                try
+                {
+                    SetValue(HighwaySetting.Wall, 0f);
+                }
+                finally
+                {
+                    applyingPreset = false;
+                }
+            }
+
+            rememberAll(game);
+        }
+
+        /// <summary>
+        /// Remembers the current values for <paramref name="game"/>: of its look and numbers only the player's changes (a value
+        /// back at the game's own is forgotten), the player's wall and speed always, and everything for Custom.
+        /// </summary>
+        private void rememberAll(HighwayPreset game)
+        {
+            bool changed = false;
+
+            foreach (var setting in game_settings)
+                changed |= remember(game, setting);
+
+            if (scrollSpeed != null)
+                changed |= memory.Set(game, scroll_speed_key, scrollSpeed.Value.ToString("R", CultureInfo.InvariantCulture));
+
+            if (changed)
+                storedMemory.Value = memory.ToString();
+        }
+
+        private bool remember(HighwayPreset game, GameSetting setting)
+        {
+            // A game without a wall keeps none.
+            if (setting.IsWall && !HighwayPresets.HasWall(game))
+                return false;
+
+            bool gamesOwn = game != HighwayPreset.Custom && !setting.IsPlayers && setting.IsGames(this, HighwayPresets.Get(game));
+            return memory.Set(game, setting.Key, gamesOwn ? null : setting.Read(this));
+        }
+
+        /// <summary>
+        /// Once per install, when games started to remember their settings (Alpha 2026-11-08): the game in use keeps what the
+        /// player had chosen until then. That is its wall and whether it keeps the visible time, and its speed and wall
+        /// numbers if they had been shown already (<see cref="HighwaySetting.PresetScalesApplied"/>; otherwise they become the
+        /// game's now). Its look was the game's own, or it would have been Custom, which keeps everything.
+        /// </summary>
+        private void startGameMemoryOnce()
+        {
+            var started = GetOriginalBindable<bool>(HighwaySetting.GameMemoryStarted);
+
+            if (started.Value)
+                return;
+
+            var game = preset.Value;
+            bool scalesShown = Get<bool>(HighwaySetting.PresetScalesApplied);
+            bool changed = false;
+
+            foreach (var setting in game_settings)
+            {
+                if (game == HighwayPreset.Custom || setting.IsPlayers || (scalesShown && setting.Setting is HighwaySetting.SpeedScale or HighwaySetting.WallScale))
+                    changed |= remember(game, setting);
+            }
+
+            if (changed)
+                storedMemory.Value = memory.ToString();
+
+            SetValue(HighwaySetting.PresetScalesApplied, true);
+            started.Value = true;
         }
 
         /// <summary>
@@ -164,22 +375,21 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
                 // A parallel camera's tilt alone sets its height; the length stays for a later perspective camera.
                 if (perspective)
                     SetValue(HighwaySetting.LaneLength, camera.LaneLength);
+
+                // Custom shows what it remembers, which is this camera now.
+                rememberAll(HighwayPreset.Custom);
             }
 
             applied.Value = true;
         }
 
         /// <summary>
-        /// Once per install, when presets started to carry their game's numbers (Alpha 2026-11-08): the preset in use sets its
-        /// speed and wall scales, as choosing it now does. Custom changes nothing.
-        /// </summary>
-        /// <summary>
         /// Once, on an install from before presets set the width (Alpha 2026-11-08): "Width by" Lane was a preference outside
         /// the presets then, and every preset is "Width by" Track or has its own lane width now. Applying the preset would
-        /// throw the player's lane width away, so such an install moves to Custom and keeps it. Runs before the scales'
-        /// once-per-install step marks the install as done.
+        /// throw the player's lane width away, so such an install moves to Custom and keeps it. Runs before
+        /// <c>startGameMemoryOnce</c> marks the install as done.
         /// </summary>
-        private void keepWidthByLane(Bindable<HighwayPreset> preset)
+        private void keepWidthByLane()
         {
             if (GetOriginalBindable<bool>(HighwaySetting.PresetScalesApplied).Value || preset.Value == HighwayPreset.Custom)
                 return;
@@ -188,18 +398,12 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
 
             if (Get<HighwayWidthMode>(HighwaySetting.WidthMode) != values.WidthMode
                 || (values.WidthMode == HighwayWidthMode.Lane && !near(Get<float>(HighwaySetting.LaneWidth), values.LaneWidth)))
+            {
                 preset.Value = HighwayPreset.Custom;
-        }
 
-        private void applyPresetScalesOnce()
-        {
-            var applied = GetOriginalBindable<bool>(HighwaySetting.PresetScalesApplied);
-
-            if (applied.Value)
-                return;
-
-            ApplyPresetScales(Get<HighwayPreset>(HighwaySetting.Preset));
-            applied.Value = true;
+                // Custom shows what it remembers, which is this look now.
+                rememberAll(HighwayPreset.Custom);
+            }
         }
 
         /// <summary>
@@ -242,6 +446,11 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
 
             applied.Value = true;
         }
+
+        /// <summary>
+        /// The settings panel's groups folded on a new install (<see cref="HighwaySetting.FoldedGroups"/>).
+        /// </summary>
+        public const string DEFAULT_FOLDED_GROUPS = "Other";
 
         protected override void InitialiseDefaults()
         {
@@ -292,6 +501,9 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
             SetDefault(HighwaySetting.SkinPortDefaultsApplied, false);
             SetDefault(HighwaySetting.PresetScalesApplied, false);
             SetDefault(HighwaySetting.FineScrollSpeed, 0.0, 0, SpeedScales.MAX_MANIA_SPEED, SpeedScales.MANIA_SPEED_PRECISION);
+            SetDefault(HighwaySetting.GameMemory, string.Empty);
+            SetDefault(HighwaySetting.GameMemoryStarted, false);
+            SetDefault(HighwaySetting.FoldedGroups, DEFAULT_FOLDED_GROUPS);
         }
 
         /// <summary>
@@ -330,110 +542,123 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
             LaneWidth = Get<float>(HighwaySetting.LaneWidth),
         };
 
-        /// <summary>
-        /// Writes a preset's look into the individual settings: camera (lane tilt, length and note approach), width, line and
-        /// note thickness, and takes the wall down for a game without one (a game with one leaves it to the player). Leaves
-        /// <see cref="HighwaySetting.WallKeepsVisibleTime"/>, <see cref="HighwaySetting.LaneGuides"/>,
-        /// <see cref="HighwaySetting.SkinHitTarget"/>, <see cref="HighwaySetting.NoteStyle"/>, <see cref="HighwaySetting.HitEffects"/>,
-        /// <see cref="HighwaySetting.Track"/>, <see cref="HighwaySetting.FarFade"/>, <see cref="HighwaySetting.HoldOpacity"/>,
-        /// <see cref="HighwaySetting.TrackOpacity"/>, <see cref="HighwaySetting.KeyBeam"/>, <see cref="HighwaySetting.KiaiSway"/>,
-        /// <see cref="HighwaySetting.KiaiLift"/> and the skin porter's settings alone (preferences, not part of a game's look). The game's speed and wall scales are
-        /// <see cref="ApplyPresetScales"/>.
-        /// </summary>
-        public void ApplyPreset(HighwayPreset preset)
-        {
-            if (preset == HighwayPreset.Custom)
-                return;
-
-            var values = HighwayPresets.Get(preset);
-
-            bool wasApplying = applyingPreset;
-            applyingPreset = true;
-
-            try
-            {
-                SetValue(HighwaySetting.CameraMode, values.CameraMode);
-                SetValue(HighwaySetting.LaneTilt, values.LaneTilt);
-                SetValue(HighwaySetting.LaneLength, values.LaneLength);
-                SetValue(HighwaySetting.Approach, values.Approach);
-                SetValue(HighwaySetting.JudgementLineHeight, values.JudgementLineHeight);
-                SetValue(HighwaySetting.TrackWidth, values.TrackWidth);
-                SetValue(HighwaySetting.NoteThickness, values.NoteThickness);
-                SetValue(HighwaySetting.WidthMode, values.WidthMode);
-                SetValue(HighwaySetting.LaneWidth, values.LaneWidth);
-
-                // A game with a wall leaves it to the player, as the arcade games do; one without takes it down.
-                if (!HighwayPresets.HasWall(preset))
-                    SetValue(HighwaySetting.Wall, 0f);
-            }
-            finally
-            {
-                applyingPreset = wasApplying;
-            }
-        }
-
-        /// <summary>
-        /// Shows the speed and the wall in a preset's game's numbers (<see cref="HighwaySettings.SpeedScale"/>,
-        /// <see cref="HighwaySettings.WallScale"/>; the wall's only if the game has one). Display only: the speed, the wall and
-        /// whether it keeps the visible time stay as they are.
-        /// </summary>
-        public void ApplyPresetScales(HighwayPreset preset)
-        {
-            if (preset == HighwayPreset.Custom)
-                return;
-
-            var values = HighwayPresets.Get(preset);
-
-            SetValue(HighwaySetting.SpeedScale, values.SpeedScale);
-
-            // A game without a wall leaves the wall's units as they are, for the next game with one.
-            if (!HighwayPresets.HasWall(preset))
-                return;
-
-            // The wall's speed behaviour stays the player's (SPEC 4: visible time kept by default), unlike choosing a scale.
-            bool wasApplying = applyingPreset;
-            applyingPreset = true;
-
-            try
-            {
-                SetValue(HighwaySetting.WallScale, values.WallScale);
-            }
-            finally
-            {
-                applyingPreset = wasApplying;
-            }
-        }
-
-        /// <summary>
-        /// Whether the current look is still the preset's. The wall counts only for a game without one (it must stay down); the
-        /// lane width only when the preset sets the width by lane (it is hidden and unused otherwise); the lane length and the
-        /// note approach only under a perspective camera (a parallel one ignores them). The track width always counts: ported
-        /// and warped skin stages use it in every width mode.
-        /// </summary>
-        private bool matches(HighwayPreset presetName)
-        {
-            var preset = HighwayPresets.Get(presetName);
-            var current = Current;
-            bool wallMatches = HighwayPresets.HasWall(presetName) || near(current.Wall, 0);
-
-            // Flat ignores the geometry, so any geometry matches the osu!mania preset.
-            if (preset.CameraMode == HighwayCameraMode.Flat)
-                return current.CameraMode == HighwayCameraMode.Flat && wallMatches;
-
-            bool perspective = preset.CameraMode == HighwayCameraMode.Perspective;
-
-            return current.CameraMode == preset.CameraMode
-                   && near(current.LaneTilt, preset.LaneTilt)
-                   && (!perspective || (near(current.LaneLength, preset.LaneLength) && near(current.Approach, preset.Approach)))
-                   && near(current.JudgementLineHeight, preset.JudgementLineHeight)
-                   && near(current.TrackWidth, preset.TrackWidth)
-                   && current.WidthMode == preset.WidthMode
-                   && (preset.WidthMode != HighwayWidthMode.Lane || near(current.LaneWidth, preset.LaneWidth))
-                   && wallMatches
-                   && near(current.NoteThickness, preset.NoteThickness);
-        }
-
         private static bool near(float a, float b) => Math.Abs(a - b) < 1e-4f;
+
+        /// <summary>
+        /// One of the settings each game remembers (<see cref="game_settings"/>), read and written as text for
+        /// <see cref="GameMemory"/>.
+        /// </summary>
+        private abstract class GameSetting
+        {
+            public readonly HighwaySetting Setting;
+            public readonly string Key;
+
+            /// <summary>
+            /// One of the wall's settings, which a game without a wall leaves alone.
+            /// </summary>
+            public readonly bool IsWall;
+
+            protected GameSetting(HighwaySetting setting, bool isWall)
+            {
+                Setting = setting;
+                Key = setting.ToString();
+                IsWall = isWall;
+            }
+
+            /// <summary>
+            /// The player's alone: no game sets it.
+            /// </summary>
+            public abstract bool IsPlayers { get; }
+
+            public abstract string Read(HighwayConfigManager config);
+            public abstract void Write(HighwayConfigManager config, string value);
+
+            /// <summary>
+            /// Whether the current value is <paramref name="game"/>'s own.
+            /// </summary>
+            public abstract bool IsGames(HighwayConfigManager config, HighwaySettings game);
+
+            public abstract void UseGames(HighwayConfigManager config, HighwaySettings game);
+
+            /// <summary>
+            /// Makes <paramref name="game"/>'s value the setting's default, which its reset button goes back to.
+            /// </summary>
+            public abstract void UseDefault(HighwayConfigManager config, HighwaySettings game);
+
+            public abstract void Watch(HighwayConfigManager config, Action changed);
+        }
+
+        private sealed class GameSetting<T> : GameSetting
+            where T : notnull
+        {
+            private readonly Func<HighwaySettings, T>? game;
+
+            public GameSetting(HighwaySetting setting, Func<HighwaySettings, T>? game, bool isWall = false)
+                : base(setting, isWall)
+            {
+                this.game = game;
+            }
+
+            public override bool IsPlayers => game == null;
+
+            public override string Read(HighwayConfigManager config) => config.Get<T>(Setting) switch
+            {
+                float f => f.ToString("R", CultureInfo.InvariantCulture),
+                var value => value.ToString() ?? string.Empty,
+            };
+
+            public override void Write(HighwayConfigManager config, string value)
+            {
+                if (tryParse(value, out T parsed))
+                    config.SetValue(Setting, parsed);
+            }
+
+            public override bool IsGames(HighwayConfigManager config, HighwaySettings values)
+            {
+                if (game == null)
+                    return false;
+
+                T current = config.Get<T>(Setting);
+                T own = game(values);
+
+                return current is float a && own is float b ? near(a, b) : EqualityComparer<T>.Default.Equals(current, own);
+            }
+
+            public override void UseGames(HighwayConfigManager config, HighwaySettings values)
+            {
+                if (game != null)
+                    config.SetValue(Setting, game(values));
+            }
+
+            public override void UseDefault(HighwayConfigManager config, HighwaySettings values)
+            {
+                if (game != null)
+                    config.GetOriginalBindable<T>(Setting).Default = game(values);
+            }
+
+            public override void Watch(HighwayConfigManager config, Action changed) => config.GetOriginalBindable<T>(Setting).ValueChanged += _ => changed();
+
+            private static bool tryParse(string text, out T value)
+            {
+                object? parsed = null;
+
+                if (typeof(T) == typeof(float))
+                {
+                    if (float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out float number))
+                        parsed = number;
+                }
+                else if (typeof(T) == typeof(bool))
+                {
+                    if (bool.TryParse(text, out bool flag))
+                        parsed = flag;
+                }
+                else if (typeof(T).IsEnum && Enum.TryParse(typeof(T), text, out object? member) && Enum.IsDefined(typeof(T), member))
+                    parsed = member;
+
+                value = parsed is T typed ? typed : default!;
+                return parsed != null;
+            }
+        }
     }
 
     public enum HighwaySetting
@@ -504,8 +729,8 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
         SkinPortDefaultsApplied,
 
         /// <summary>
-        /// Not shown: whether the preset in use has set its game's speed and wall scales on this install
-        /// (<c>applyPresetScalesOnce</c>, Alpha 2026-11-08).
+        /// Not shown: whether the preset in use has set its game's speed and wall scales on this install (Alpha 2026-11-08;
+        /// <c>startGameMemoryOnce</c> sets it now).
         /// </summary>
         PresetScalesApplied,
 
@@ -546,5 +771,22 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
         /// (<c>keepCustomCameraAsTilt</c>, Alpha 2026-11-08).
         /// </summary>
         LaneTiltApplied,
+
+        /// <summary>
+        /// Not shown: what each game remembers of the settings under "Game preset" (<see cref="Configuration.GameMemory"/>,
+        /// Alpha 2026-11-08).
+        /// </summary>
+        GameMemory,
+
+        /// <summary>
+        /// Not shown: whether the game in use has taken over the player's wall, speed and numbers on this install
+        /// (<c>startGameMemoryOnce</c>, Alpha 2026-11-08).
+        /// </summary>
+        GameMemoryStarted,
+
+        /// <summary>
+        /// The settings panel's folded groups, by name, comma separated. Only how the panel looks.
+        /// </summary>
+        FoldedGroups,
     }
 }

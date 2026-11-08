@@ -20,6 +20,7 @@ using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
+using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Input.Bindings;
@@ -41,7 +42,7 @@ using Realms;
 namespace osu.Game.Rulesets.ManiaOrtho.Tests.Configuration
 {
     /// <summary>
-    /// Settings plumbing: values persist, presets fill in values, editing a value makes the preset Custom, and the
+    /// Settings plumbing: values persist, presets fill in values, each game remembers what the player changes, and the
     /// settings subsection loads. Headless under <c>dotnet test</c>; run it through the playtest runner with
     /// <c>--scene TestSceneHighwaySettings --screenshot out.png</c> to see the panel.
     /// </summary>
@@ -55,6 +56,8 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Configuration
 
         private SettingsStore store = null!;
 
+        private SearchContainer search = null!;
+
         [SetUpSteps]
         public void SetUpSteps()
         {
@@ -64,6 +67,7 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Configuration
                 using (var config = create())
                 {
                     config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Chunithm);
+                    config.Highway.ForgetGames(); // each game remembers its settings; start from its own
                     config.Highway.SetValue(HighwaySetting.Wall, 0f); // a game with a wall leaves it to the player
                     config.Highway.GetBindable<WallScale>(HighwaySetting.WallScale).SetDefault();
                     config.Highway.SetValue(HighwaySetting.WallKeepsVisibleTime, true);
@@ -77,6 +81,12 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Configuration
                 gameConfig.Highway.GetBindable<bool>(HighwaySetting.ShareManiaKeys).SetDefault();
                 gameConfig.Highway.GetBindable<SpeedScale>(HighwaySetting.SpeedScale).SetDefault();
                 gameConfig.GetBindable<double>(ManiaRulesetSetting.ScrollSpeed).SetDefault();
+                gameConfig.Highway.ForgetGames();
+                gameConfig.Highway.SetValue(HighwaySetting.FoldedGroups, HighwayConfigManager.DEFAULT_FOLDED_GROUPS);
+
+                // Now, not 100 ms later in the background, where it would overwrite what a test's own configs store.
+                gameConfig.Save();
+                gameConfig.Highway.Save();
             });
         }
 
@@ -338,7 +348,7 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Configuration
                            && near(current.Wall, 0.25f)
                            && near(current.NoteThickness, 0.04f)
                            && !current.WallKeepsVisibleTime
-                           && config.Highway.Get<HighwayPreset>(HighwaySetting.Preset) == HighwayPreset.Custom
+                           && config.Highway.Get<HighwayPreset>(HighwaySetting.Preset) == HighwayPreset.Chunithm
                            && config.Get<double>(ManiaRulesetSetting.ScrollSpeed) == 29.0;
                 }
             });
@@ -599,9 +609,13 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Configuration
                 gameConfig.GetBindable<double>(ManiaRulesetSetting.ScrollSpeed).SetDefault();
                 gameConfig.Highway.GetBindable<WallScale>(HighwaySetting.WallScale).SetDefault();
                 gameConfig.Highway.GetBindable<bool>(HighwaySetting.WallKeepsVisibleTime).SetDefault();
+                gameConfig.Highway.ForgetGames();
                 gameConfig.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Custom);
                 gameConfig.Highway.GetBindable<HighwayPreset>(HighwaySetting.Preset).SetDefault();
                 gameConfig.Highway.GetBindable<float>(HighwaySetting.Wall).SetDefault();
+                gameConfig.Highway.ForgetGames();
+                gameConfig.Save();
+                gameConfig.Highway.Save();
                 Beatmap.SetDefault();
                 SelectedMods.SetDefault();
             });
@@ -633,24 +647,27 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Configuration
             // Sekai's notes are 7.4% of the screen tall at the line (research/game-sekai.md).
             AddAssert("Sekai notes are Sekai's height at the line", () => heightAtLine(HighwayPreset.Sekai), () => Is.InRange(0.067f, 0.081f));
 
-            AddAssert("note thickness is part of a preset", () =>
+            AddAssert("editing a value keeps the game", () =>
             {
                 using (var config = create())
                 {
-                    config.Highway.SetValue(HighwaySetting.NoteThickness, 0.03f);
-                    return config.Highway.Get<HighwayPreset>(HighwaySetting.Preset) == HighwayPreset.Custom;
+                    config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Chunithm);
+                    config.Highway.SetValue(HighwaySetting.TrackWidth, 0.9f);
+                    return config.Highway.Get<HighwayPreset>(HighwaySetting.Preset) == HighwayPreset.Chunithm
+                           && near(config.Highway.Get<float>(HighwaySetting.TrackWidth), 0.9f)
+                           && config.Highway.GameChanged;
                 }
             });
 
-            AddAssert("editing a value makes it Custom", () =>
+            AddAssert("its reset goes back to the game's value", () =>
             {
                 using (var config = create())
                 {
-                    config.Highway.SetValue(HighwaySetting.TrackWidth, 0.9f);
-                    return config.Highway.Get<HighwayPreset>(HighwaySetting.Preset) == HighwayPreset.Custom
-                           && near(config.Highway.Get<float>(HighwaySetting.TrackWidth), 0.9f);
+                    var trackWidth = config.Highway.GetBindable<float>(HighwaySetting.TrackWidth);
+                    trackWidth.SetDefault();
+                    return (trackWidth.Value, config.Highway.GameChanged);
                 }
-            });
+            }, () => Is.EqualTo((HighwayPresets.Get(HighwayPreset.Chunithm).TrackWidth, false)));
 
             AddAssert("Classic switches to flat", () =>
             {
@@ -663,8 +680,8 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Configuration
         }
 
         /// <summary>
-        /// Presets by game (Alpha 2026-11-08): choosing one sets its look (camera, line, lane or stage width, note thickness)
-        /// and shows the speed and the wall in its numbers, which then stay as the player leaves them.
+        /// Presets by game (Alpha 2026-11-08): choosing one for the first time sets its look (camera, line, lane or stage width,
+        /// note thickness) and shows the speed and the wall in its numbers, which then stay as the player leaves them.
         /// </summary>
         /// <param name="preset">The game.</param>
         /// <param name="speedScale">The game's speed numbers.</param>
@@ -686,6 +703,7 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Configuration
                 using (var config = create())
                 {
                     config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Custom);
+                    config.Highway.ForgetGames(); // so the game is chosen for the first time
                     config.Highway.SetValue(HighwaySetting.Wall, 0.3f);
                     config.Highway.SetValue(HighwaySetting.WallScale, WallScale.Percent);
                     config.Highway.SetValue(HighwaySetting.WallKeepsVisibleTime, true);
@@ -723,15 +741,6 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Configuration
         [Test]
         public void TestWidthIsPartOfAGamesLook()
         {
-            AddAssert("lanes on Chunithm make it Custom", () =>
-            {
-                using (var config = create())
-                {
-                    config.Highway.SetValue(HighwaySetting.WidthMode, HighwayWidthMode.Lane);
-                    return config.Highway.Get<HighwayPreset>(HighwaySetting.Preset) == HighwayPreset.Custom;
-                }
-            });
-
             AddAssert("IIDX is drawn by lane", () =>
             {
                 using (var config = create())
@@ -741,41 +750,146 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Configuration
                 }
             });
 
-            AddAssert("its lane width makes it Custom", () =>
-            {
-                using (var config = create())
-                {
-                    config.Highway.SetValue(HighwaySetting.LaneWidth, 0.05f);
-                    return config.Highway.Get<HighwayPreset>(HighwaySetting.Preset) == HighwayPreset.Custom;
-                }
-            });
-
-            // Ported and warped skin stages use the track width in either mode.
-            AddAssert("so does its track width", () =>
-            {
-                using (var config = create())
-                {
-                    config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Iidx);
-                    config.Highway.SetValue(HighwaySetting.TrackWidth, 0.9f);
-                    return config.Highway.Get<HighwayPreset>(HighwaySetting.Preset) == HighwayPreset.Custom;
-                }
-            });
-
-            // Hidden and unused while the track width sets the width.
-            AddAssert("Chunithm's lane width leaves it Chunithm", () =>
+            AddAssert("lanes on Chunithm stay Chunithm's", () =>
             {
                 using (var config = create())
                 {
                     config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Chunithm);
+                    config.Highway.SetValue(HighwaySetting.WidthMode, HighwayWidthMode.Lane);
                     config.Highway.SetValue(HighwaySetting.LaneWidth, 0.05f);
-                    return config.Highway.Get<HighwayPreset>(HighwaySetting.Preset) == HighwayPreset.Chunithm;
+                }
+
+                using (var config = create())
+                {
+                    config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Iidx);
+                    config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Chunithm);
+                    return (config.Highway.Get<HighwayPreset>(HighwaySetting.Preset), config.Highway.Current.WidthMode, config.Highway.Current.LaneWidth);
+                }
+            }, () => Is.EqualTo((HighwayPreset.Chunithm, HighwayWidthMode.Lane, 0.05f)));
+
+            AddAssert("and IIDX keeps its own lane width", () =>
+            {
+                using (var config = create())
+                {
+                    config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Iidx);
+                    return config.Highway.Current.LaneWidth;
+                }
+            }, () => Is.EqualTo(HighwayPresets.Get(HighwayPreset.Iidx).LaneWidth));
+        }
+
+        /// <summary>
+        /// Each game remembers its own settings (Alpha 2026-11-08): its look and numbers as the player changed them, and the
+        /// player's speed and wall. A game chosen for the first time starts from the speed and wall in use; Custom keeps all of
+        /// its values.
+        /// </summary>
+        [Test]
+        public void TestEachGameRemembersItsSettings()
+        {
+            AddStep("Chunithm: wall 0.3, speed 12, lane tilted to 50°", () =>
+            {
+                using (var config = create())
+                {
+                    config.SetValue(ManiaRulesetSetting.ScrollSpeed, 12.0);
+                    config.Highway.SetValue(HighwaySetting.Wall, 0.3f);
+                    config.Highway.SetValue(HighwaySetting.LaneTilt, 50f);
+                }
+            });
+
+            AddAssert("SDVX, first time: no wall, the same speed, its own lane", () =>
+            {
+                using (var config = create())
+                {
+                    config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Voltex);
+                    return (config.Highway.Get<float>(HighwaySetting.Wall), config.Get<double>(ManiaRulesetSetting.ScrollSpeed), config.Highway.Current.LaneTilt);
+                }
+            }, () => Is.EqualTo((0f, 12.0, HighwayPresets.Get(HighwayPreset.Voltex).LaneTilt)));
+
+            AddStep("SDVX at speed 20, a shorter lane", () =>
+            {
+                using (var config = create())
+                {
+                    config.SetValue(ManiaRulesetSetting.ScrollSpeed, 20.0);
+                    config.Highway.SetValue(HighwaySetting.LaneLength, 6f);
+                }
+            });
+
+            AddAssert("Chunithm again: its wall, speed and tilt", () =>
+            {
+                using (var config = create())
+                {
+                    config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Chunithm);
+                    return (config.Highway.Get<float>(HighwaySetting.Wall), config.Get<double>(ManiaRulesetSetting.ScrollSpeed), config.Highway.Current.LaneTilt);
+                }
+            }, () => Is.EqualTo((0.3f, 12.0, 50f)));
+
+            AddAssert("SDVX again: its speed and lane", () =>
+            {
+                using (var config = create())
+                {
+                    config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Voltex);
+                    return (config.Get<double>(ManiaRulesetSetting.ScrollSpeed), config.Highway.Current.LaneLength, config.Highway.Current.LaneTilt);
+                }
+            }, () => Is.EqualTo((20.0, 6f, HighwayPresets.Get(HighwayPreset.Voltex).LaneTilt)));
+
+            AddAssert("a value reset to the game's follows the game again", () =>
+            {
+                using (var config = create())
+                {
+                    config.Highway.SetValue(HighwaySetting.JudgementLineHeight, 0.2f);
+                    config.Highway.GetBindable<float>(HighwaySetting.JudgementLineHeight).SetDefault();
+                }
+
+                using (var config = create())
+                    return (config.Highway.Current.JudgementLineHeight, config.Highway.Get<string>(HighwaySetting.GameMemory).Contains("JudgementLineHeight", StringComparison.Ordinal));
+            }, () => Is.EqualTo((HighwayPresets.Get(HighwayPreset.Voltex).JudgementLineHeight, false)));
+
+            AddAssert("Custom starts from SDVX, then keeps its own", () =>
+            {
+                using (var config = create())
+                {
+                    config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Custom);
+                    bool startsFromSdvx = near(config.Highway.Current.LaneLength, 6f);
+                    config.Highway.SetValue(HighwaySetting.LaneTilt, 30f);
+                    config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Chunithm);
+                    config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Custom);
+                    return startsFromSdvx && near(config.Highway.Current.LaneTilt, 30f) && near(config.Highway.Current.LaneLength, 6f);
                 }
             });
         }
 
         /// <summary>
-        /// The wall is the player's in a game with one, as the speed is: it keeps the preset and stays on the next start. A game
-        /// without one takes it down, and raising it there makes the preset Custom.
+        /// The update that started each game's memory: the game in use keeps the player's wall, speed and numbers.
+        /// </summary>
+        [Test]
+        public void TestGameMemoryStartsFromAnInstallBefore()
+        {
+            AddStep("an install from before, on Chunithm with a wall and osu!mania's numbers", () =>
+            {
+                using (var config = create())
+                {
+                    config.SetValue(ManiaRulesetSetting.ScrollSpeed, 17.0);
+                    config.Highway.SetValue(HighwaySetting.Wall, 0.25f);
+                    config.Highway.SetValue(HighwaySetting.SpeedScale, SpeedScale.Mania);
+                    config.Highway.SetValue(HighwaySetting.GameMemoryStarted, false);
+                    config.Highway.SetValue(HighwaySetting.GameMemory, string.Empty);
+                }
+            });
+
+            AddAssert("Chunithm kept them, through SDVX and back", () =>
+            {
+                using (var config = create())
+                {
+                    config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Voltex);
+                    config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Chunithm);
+                    return (config.Highway.Get<float>(HighwaySetting.Wall), config.Get<double>(ManiaRulesetSetting.ScrollSpeed),
+                        config.Highway.Get<SpeedScale>(HighwaySetting.SpeedScale));
+                }
+            }, () => Is.EqualTo((0.25f, 17.0, SpeedScale.Mania)));
+        }
+
+        /// <summary>
+        /// The wall is the player's in a game with one, as the speed is: it keeps the preset, stays on the next start and comes
+        /// back with the game (Alpha 2026-11-08). A game without one keeps it down.
         /// </summary>
         [Test]
         public void TestWallInAGamesPreset()
@@ -806,15 +920,37 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Configuration
                 }
             }, () => Is.Zero);
 
-            AddAssert("raising it under osu!mania makes it Custom", () =>
+            AddAssert("and keeps it down", () =>
             {
                 using (var config = create())
                 {
-                    config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Classic);
                     config.Highway.SetValue(HighwaySetting.Wall, 0.2f);
-                    return config.Highway.Get<HighwayPreset>(HighwaySetting.Preset);
+                    return (config.Highway.Get<HighwayPreset>(HighwaySetting.Preset), config.Highway.Get<float>(HighwaySetting.Wall));
                 }
-            }, () => Is.EqualTo(HighwayPreset.Custom));
+            }, () => Is.EqualTo((HighwayPreset.Voltex, 0f)));
+
+            AddAssert("Chunithm brings its wall back", () =>
+            {
+                using (var config = create())
+                {
+                    config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Chunithm);
+                    return config.Highway.Get<float>(HighwaySetting.Wall);
+                }
+            }, () => Is.EqualTo(0.3f));
+
+            AddAssert("IIDX starts from it, then keeps its own", () =>
+            {
+                using (var config = create())
+                {
+                    config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Iidx);
+                    bool startsFromIt = near(config.Highway.Get<float>(HighwaySetting.Wall), 0.3f);
+                    config.Highway.SetValue(HighwaySetting.Wall, 0.5f);
+                    config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Chunithm);
+                    bool chunithms = near(config.Highway.Get<float>(HighwaySetting.Wall), 0.3f);
+                    config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Iidx);
+                    return startsFromIt && chunithms && near(config.Highway.Get<float>(HighwaySetting.Wall), 0.5f);
+                }
+            });
         }
 
         /// <summary>
@@ -832,6 +968,8 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Configuration
                     config.Highway.SetValue(HighwaySetting.WidthMode, HighwayWidthMode.Lane);
                     config.Highway.SetValue(HighwaySetting.LaneWidth, 0.06f);
                     config.Highway.SetValue(HighwaySetting.PresetScalesApplied, false);
+                    config.Highway.SetValue(HighwaySetting.GameMemoryStarted, false);
+                    config.Highway.SetValue(HighwaySetting.GameMemory, string.Empty);
                 }
 
                 // Back on Chunithm, as the old version kept it: "Width by" was outside the presets then.
@@ -864,6 +1002,8 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Configuration
                     config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Voltex);
                     config.Highway.SetValue(HighwaySetting.SpeedScale, SpeedScale.Mania);
                     config.Highway.SetValue(HighwaySetting.PresetScalesApplied, false);
+                    config.Highway.SetValue(HighwaySetting.GameMemoryStarted, false);
+                    config.Highway.SetValue(HighwaySetting.GameMemory, string.Empty);
                 }
             });
 
@@ -887,8 +1027,8 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Configuration
         }
 
         /// <summary>
-        /// Alpha 2026-11-08: maniaortho's own settings first, then the game preset with that game's settings; a game without a
-        /// wall shows none.
+        /// Alpha 2026-11-08: "Settings: orthomania" first, its Gameplay and Other settings in groups that fold, then "Game preset"
+        /// with the game first and its settings under it; a game without a wall shows none.
         /// </summary>
         [Test]
         public void TestSettingsPanel()
@@ -901,18 +1041,67 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Configuration
             });
             showPanel();
 
-            AddAssert("maniaortho's section, then the game preset's", () => this.ChildrenOfType<SettingsGroupHeader>().Where(h => h.Section).Select(h => h.Text.ToString()),
-                () => Is.EqualTo(new[] { "maniaortho", "Game preset" }));
-            AddAssert("the speed is in the game preset's section", sectionOf<FormEnumDropdown<SpeedScale>>, () => Is.EqualTo("Game preset"));
-            AddAssert("the skin layout is in maniaortho's", sectionOf<FormEnumDropdown<SkinStageFit>>, () => Is.EqualTo("maniaortho"));
-            AddAssert("Chunithm has a wall", () => wallHeader.IsPresent && shown(this.ChildrenOfType<FormEnumDropdown<WallScale>>().Single()));
+            AddAssert("Settings: orthomania, then Game preset", () => groups(SettingsGroupStyle.Section), () => Is.EqualTo(new[] { "Settings: orthomania", "Game preset" }));
+            AddAssert("their groups", () => groups(SettingsGroupStyle.Fold),
+                () => Is.EqualTo(new[] { "Gameplay", "Other settings", "Speed", "Lane and camera", "Lane and note size", "Wall" }));
+            AddAssert("the notes come first", () => firstSettingIn("Settings: orthomania"), () => Is.EqualTo("Notes"));
+            AddAssert("the game comes first in Game preset", () => firstSettingIn("Game preset"), () => Is.EqualTo("Game"));
+            AddAssert("the speed and the lane tilt are the game's", () => new[] { groupAbove(speedScaleDropdown), groupAbove(cameraSlider("Lane tilt")) },
+                () => Is.All.EqualTo("Game preset"));
+            AddAssert("the skin layout is orthomania's", () => groupAbove(this.ChildrenOfType<FormEnumDropdown<SkinStageFit>>().Single()), () => Is.EqualTo("Settings: orthomania"));
+            AddAssert("Chunithm has a wall", () => group("Wall").IsPresent && shown(this.ChildrenOfType<FormEnumDropdown<WallScale>>().Single()));
 
             AddStep("SDVX", () => gameConfig.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Voltex));
-            AddUntilStep("no wall settings", () => !wallHeader.IsPresent && !shown(this.ChildrenOfType<FormEnumDropdown<WallScale>>().Single())
+            AddUntilStep("no wall settings", () => !group("Wall").IsPresent && !shown(this.ChildrenOfType<FormEnumDropdown<WallScale>>().Single())
                                                    && !this.ChildrenOfType<FormCheckBox>().Any(c => c.Caption.ToString() == "Wall keeps visible time" && shown(c)));
 
             AddStep("a wall by hand", () => gameConfig.Highway.SetValue(HighwaySetting.Wall, 0.2f));
-            AddUntilStep("Custom, with the wall's settings", () => gameConfig.Highway.Get<HighwayPreset>(HighwaySetting.Preset) == HighwayPreset.Custom && wallHeader.IsPresent);
+            AddUntilStep("still SDVX, still no wall", () => (gameConfig.Highway.Get<HighwayPreset>(HighwaySetting.Preset), gameConfig.Highway.Get<float>(HighwaySetting.Wall), group("Wall").IsPresent),
+                () => Is.EqualTo((HighwayPreset.Voltex, 0f, false)));
+
+            AddStep("Chunithm again", () => gameConfig.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Chunithm));
+            AddUntilStep("the wall's settings are back", () => group("Wall").IsPresent);
+        }
+
+        /// <summary>
+        /// The groups fold (Alpha 2026-11-08: "not a long list of things to scroll through"): Other settings starts folded, a
+        /// fold stays as left, and searching finds settings in a folded group.
+        /// </summary>
+        [Test]
+        public void TestSettingsFold()
+        {
+            showPanel();
+
+            AddAssert("other settings folded, the rest open", () => groupsShowing(), () => Is.EqualTo(new[] { "Gameplay", "Speed", "Lane and camera", "Lane and note size", "Wall" }));
+            AddAssert("their settings hidden", () => onScreen(this.ChildrenOfType<FormEnumDropdown<SkinStageFit>>().Single()), () => Is.False);
+
+            AddStep("unfold other settings", () => clickFold("Other settings"));
+            AddUntilStep("shown", () => onScreen(this.ChildrenOfType<FormEnumDropdown<SkinStageFit>>().Single()));
+            AddStep("fold the lane and its size", () =>
+            {
+                clickFold("Lane and camera");
+                clickFold("Lane and note size");
+            });
+            AddAssert("remembered", () => gameConfig.Highway.Get<string>(HighwaySetting.FoldedGroups), () => Is.EqualTo("Lane,Size"));
+
+            showPanel();
+            AddAssert("folded as left", () => groupsShowing(), () => Is.EqualTo(new[] { "Gameplay", "Other settings", "Speed", "Wall" }));
+
+            AddStep("search \"angle\"", () => search.SearchTerm = "angle");
+            AddUntilStep("found in its folded group", () => onScreen(cameraSlider("Lane tilt")));
+            AddAssert("nothing else of the group", () => onScreen(cameraSlider("Judgement line height")), () => Is.False);
+            AddAssert("the gameplay settings hidden", () => onScreen(this.ChildrenOfType<FormEnumDropdown<HighwayNoteStyle>>().Single()), () => Is.False);
+            AddAssert("its section's heading kept", () => group("Game preset").IsPresent && !group("Settings: orthomania").IsPresent);
+
+            AddStep("search a group's name", () => search.SearchTerm = "skin layout");
+            AddUntilStep("all of the group", () => onScreen(this.ChildrenOfType<FormEnumDropdown<SkinStageFit>>().Single())
+                                                   && onScreen(this.ChildrenOfType<FormEnumDropdown<SkinKeyArea>>().Single()));
+
+            AddStep("search \"pjsk\"", () => search.SearchTerm = "pjsk");
+            AddUntilStep("the game", () => onScreen(this.ChildrenOfType<FormEnumDropdown<HighwayPreset>>().Single()));
+
+            AddStep("no search", () => search.SearchTerm = string.Empty);
+            AddUntilStep("folded again", () => !onScreen(cameraSlider("Lane tilt")) && onScreen(this.ChildrenOfType<FormEnumDropdown<HighwayNoteStyle>>().Single()));
         }
 
         /// <summary>
@@ -932,36 +1121,20 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Configuration
                                                                                 .Select(p => HighwayPresets.Get(p).ToLayout().FarY),
                 () => Is.All.EqualTo(0));
 
-            AddAssert("tilting makes it Custom", () =>
+            AddAssert("SDVX remembers a tilt, Project Sekai an approach", () =>
             {
                 using (var config = create())
                 {
                     config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Voltex);
                     config.Highway.SetValue(HighwaySetting.LaneTilt, 70f);
-                    return config.Highway.Get<HighwayPreset>(HighwaySetting.Preset);
-                }
-            }, () => Is.EqualTo(HighwayPreset.Custom));
-
-            AddAssert("so does the approach", () =>
-            {
-                using (var config = create())
-                {
                     config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Sekai);
                     config.Highway.SetValue(HighwaySetting.Approach, ApproachCurve.PERSPECTIVE);
-                    return config.Highway.Get<HighwayPreset>(HighwaySetting.Preset);
+                    config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Voltex);
+                    float tilt = config.Highway.Current.LaneTilt;
+                    config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Sekai);
+                    return (tilt, config.Highway.Current.Approach, config.Highway.Get<HighwayPreset>(HighwaySetting.Preset));
                 }
-            }, () => Is.EqualTo(HighwayPreset.Custom));
-
-            AddAssert("a straight-on game ignores the hidden length and approach", () =>
-            {
-                using (var config = create())
-                {
-                    config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Iidx);
-                    config.Highway.SetValue(HighwaySetting.LaneLength, 9f);
-                    config.Highway.SetValue(HighwaySetting.Approach, ApproachCurve.EVEN);
-                    return config.Highway.Get<HighwayPreset>(HighwaySetting.Preset);
-                }
-            }, () => Is.EqualTo(HighwayPreset.Iidx));
+            }, () => Is.EqualTo((70f, ApproachCurve.PERSPECTIVE, HighwayPreset.Sekai)));
 
             static (float, float) layoutOf(HighwayPreset preset)
             {
@@ -991,6 +1164,8 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Configuration
                     config.Highway.SetValue(HighwaySetting.FarWidthRatio, farWidthRatio);
                     config.Highway.SetValue(HighwaySetting.FarEdgeHeight, farEdgeHeight);
                     config.Highway.SetValue(HighwaySetting.LaneTiltApplied, false);
+                    config.Highway.SetValue(HighwaySetting.GameMemoryStarted, false);
+                    config.Highway.SetValue(HighwaySetting.GameMemory, string.Empty);
                 }
             });
 
@@ -1090,25 +1265,51 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Configuration
 
         private FormSliderBar<float> cameraSlider(string caption) => this.ChildrenOfType<FormSliderBar<float>>().Single(b => b.Caption.ToString() == caption);
 
-        private SettingsGroupHeader wallHeader => this.ChildrenOfType<SettingsGroupHeader>().Single(h => h.Text.ToString() == "Wall");
+        private FormEnumDropdown<SpeedScale> speedScaleDropdown => this.ChildrenOfType<FormEnumDropdown<SpeedScale>>().Single();
+
+        private OrthoSettingsGroup group(string title) => this.ChildrenOfType<OrthoSettingsGroup>().Single(g => g.Title.ToString() == title);
 
         /// <summary>
-        /// The section heading over the first setting of a type, by the panel's order.
+        /// The panel's groups of a style, by title in the panel's order.
         /// </summary>
-        private string sectionOf<T>()
-            where T : Drawable
-        {
-            string section = string.Empty;
+        private string[] groups(SettingsGroupStyle style) => this.ChildrenOfType<OrthoSettingsGroup>().Where(g => g.Style == style).Select(g => g.Title.ToString()).ToArray();
 
-            foreach (var drawable in this.ChildrenOfType<Drawable>())
+        private string[] groupsShowing() => this.ChildrenOfType<OrthoSettingsGroup>().Where(g => g.Style == SettingsGroupStyle.Fold && g.IsPresent && g.ContentShown)
+                                                .Select(g => g.Title.ToString()).ToArray();
+
+        private void clickFold(string title) => group(title).ChildrenOfType<OsuClickableContainer>().First().TriggerClick();
+
+        /// <summary>
+        /// The caption of the first setting in a group.
+        /// </summary>
+        private string firstSettingIn(string title) => group(title).ChildrenOfType<SettingsItemV2>().First().Control.FilterTerms.First().ToString();
+
+        /// <summary>
+        /// The section a setting is in.
+        /// </summary>
+        private static string groupAbove(Drawable setting)
+        {
+            for (var parent = setting.Parent; parent != null; parent = parent.Parent)
             {
-                if (drawable is SettingsGroupHeader { Section: true } header)
-                    section = header.Text.ToString();
-                else if (drawable is T)
-                    return section;
+                if (parent is OrthoSettingsGroup { Style: SettingsGroupStyle.Section } section)
+                    return section.Title.ToString();
             }
 
             return string.Empty;
+        }
+
+        /// <summary>
+        /// Whether a setting is on the panel now: it and everything around it present.
+        /// </summary>
+        private static bool onScreen(Drawable setting)
+        {
+            for (Drawable? drawable = setting; drawable != null; drawable = drawable.Parent)
+            {
+                if (!drawable.IsPresent)
+                    return false;
+            }
+
+            return true;
         }
 
         /// <summary>
@@ -1236,7 +1437,13 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Configuration
                     Children = new Drawable[]
                     {
                         new Box { RelativeSizeAxes = Axes.Both, Colour = colourProvider.Background4 },
-                        new ManiaOrthoSettingsSubsection(new ManiaOrthoRuleset()),
+                        // Searched as the settings overlay searches its sections.
+                        search = new SearchContainer
+                        {
+                            RelativeSizeAxes = Axes.X,
+                            AutoSizeAxes = Axes.Y,
+                            Child = new ManiaOrthoSettingsSubsection(new ManiaOrthoRuleset()),
+                        },
                     }
                 };
 

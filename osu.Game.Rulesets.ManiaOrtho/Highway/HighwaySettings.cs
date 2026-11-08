@@ -686,8 +686,8 @@ namespace osu.Game.Rulesets.ManiaOrtho.Highway
 
         /// <summary>
         /// Whether the game has a wall or lane cover to set (Alpha 2026-11-08: SDVX and Project Sekai have none). Under a preset
-        /// with one the wall is the player's, as speed is; under one without, the wall is down and its settings are hidden, and
-        /// raising it anyway (Shift with the speed keys) makes the preset Custom.
+        /// with one the wall is the player's, as speed is, and the game remembers it; under one without, the wall stays down,
+        /// its settings are hidden and the wall keys do nothing.
         /// </summary>
         public static bool HasWall(HighwayPreset preset) => preset switch
         {

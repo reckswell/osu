@@ -108,6 +108,10 @@ namespace osu.Game.Rulesets.ManiaOrtho.UI
             if (steps == 0)
                 return false;
 
+            // A game without a wall keeps it down (HighwayPresets.HasWall).
+            if (!HighwayPresets.HasWall(config.Get<HighwayPreset>(HighwaySetting.Preset)))
+                return false;
+
             var settings = config.Current;
             var layout = settings.ToLayout();
             wall.Value = WallScales.Step(settings.WallScale, wall.Value, steps, layout.FarWidthRatio, layout.Approach);

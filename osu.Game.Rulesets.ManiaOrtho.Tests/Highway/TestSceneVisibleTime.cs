@@ -217,6 +217,7 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Highway
             $"{camera}, wall {wall:0%}, keep visible time: {keepVisibleTime}, {(classicSkin ? "classic" : "default")} skin, speed {speed}", () =>
             {
                 skins.CurrentSkinInfo.Value = classicSkin ? DefaultLegacySkin.CreateInfo().ToLiveUnmanaged() : ArgonSkin.CreateInfo().ToLiveUnmanaged();
+                highwayConfig.ForgetGames(); // each game remembers its settings; start from its own
                 highwayConfig.SetValue(HighwaySetting.Preset, HighwayPreset.Custom);
                 highwayConfig.SetValue(HighwaySetting.Preset, HighwayPreset.Chunithm);
                 // The preset shows Chunithm's numbers; these toasts are in osu!mania's speed and percent of the wall.

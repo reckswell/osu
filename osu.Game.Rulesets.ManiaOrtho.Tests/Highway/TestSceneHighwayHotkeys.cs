@@ -52,6 +52,7 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Highway
         {
             AddStep("Chunithm preset (no wall), wall in percent", () =>
             {
+                config.Highway.ForgetGames(); // each game remembers its settings; start from its own
                 config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Custom);
                 config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Chunithm);
                 config.Highway.SetValue(HighwaySetting.Wall, 0f); // a game with a wall leaves it to the player

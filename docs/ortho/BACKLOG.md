@@ -205,6 +205,11 @@ Only after Alpha confirms. See the design doc's "Local-only vs self-hosted serve
   no wall settings for games without one; "Note thickness" up to 15%; the panel in a maniaortho section and a game preset
   section (`research/topic-presets-by-game.md`; DECISIONS 2026-11-08). Gate: `TestGamePresets` per preset,
   `TestSettingsPanel`, playtest captures of each preset.
+- [x] Settings by game, remembered (Alpha's ask, 2026-11-08): "Settings: orthomania" (Gameplay, Other settings) then
+  "Game preset" (the game, Speed, Lane and camera, Lane and note size, Wall), groups that fold and stay as left; each
+  game remembers its settings (SDVX no wall, Chunithm its last wall and speed); the wall keys do nothing in a game
+  without a wall. Gate: `TestSettingsPanel`, `TestSettingsFold`, `TestEachGameRemembersItsSettings`,
+  `TestWallInAGamesPreset`, `TestGameMemoryStartsFromAnInstallBefore`; the menu checked in the game on Alpha's PC.
 - [x] Optional "Key beam" length: Long (today) / Half / Quarter of the track's height on screen, default Long
   (`game-djmax.md` R2). Half and Quarter measured to the wall's edge when there is one (DECISIONS 2026-11-04).
 - [x] Speed in other games' numbers (Alpha's ask, 2026-11-07): "Speed scale" with Chunithm, SDVX, IIDX green number,
