@@ -1,5 +1,8 @@
 # Project Sekai (Colorful Stage!)
 
+> **Update (2026-11-08, `topic-approach-angles.md` §7):** an official frame (Alpha's screenshot) matches the
+> Sonolus geometry below to about 1% of H: line 0.792H, lane to the top edge, vanishing point −0.052H, far/near about 0.075.
+
 > **Update (2026-11-07, `topic-speed-scales.md`):** the official range 1.0-12.0 now has a source [SS29].
 
 Last checked: 2026-11-04
