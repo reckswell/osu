@@ -19,6 +19,7 @@ using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.ManiaOrtho.Configuration;
 using osu.Game.Rulesets.ManiaOrtho.Highway;
+using osu.Game.Rulesets.ManiaOrtho.UI;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring.Legacy;
 using osu.Game.Skinning;
@@ -27,8 +28,9 @@ using osu.Game.Utils;
 namespace osu.Game.Rulesets.ManiaOrtho
 {
     /// <summary>
-    /// This ruleset's section in the settings overlay: mania's scroll speed and note colouring, then the highway.
-    /// Mania's scroll direction is left out on purpose: the camera decides the direction (SPEC section 3).
+    /// This ruleset's section in the settings overlay (Alpha 2026-11-08: organised by game): maniaortho's own settings (notes,
+    /// track and effects, skin layout, input), then the game preset with that game's speed, camera, sizes and wall. Mania's
+    /// scroll direction is left out on purpose: the camera decides the direction (SPEC section 3).
     /// </summary>
     public partial class ManiaOrthoSettingsSubsection : RulesetSettingsSubsection
     {
@@ -104,6 +106,16 @@ namespace osu.Game.Rulesets.ManiaOrtho
         private readonly Dictionary<WallScale, SettingsItemV2> wallSliders = new Dictionary<WallScale, SettingsItemV2>();
 
         private bool syncingWall;
+
+        private Bindable<HighwayPreset> preset = null!;
+
+        /// <summary>
+        /// The wall's heading and settings, hidden under a game without a wall (<see cref="HighwayPresets.HasWall"/>).
+        /// </summary>
+        private SettingsGroupHeader wallHeader = null!;
+
+        private SettingsItemV2 wallScaleItem = null!;
+        private SettingsItemV2 wallKeepsVisibleTimeItem = null!;
 
         public ManiaOrthoSettingsSubsection(ManiaOrthoRuleset ruleset)
             : base(ruleset)
@@ -204,183 +216,8 @@ namespace osu.Game.Rulesets.ManiaOrtho
 
             Children = new Drawable[]
             {
-                new SettingsItemV2(new FormEnumDropdown<SpeedScale>
-                {
-                    Caption = "Speed scale",
-                    HintText = "The numbers the speed is set in: osu!mania's scroll speed, or another game's own speed, each giving the "
-                               + "time that game gives notes. Only the numbers change: the speed is one setting, so switching keeps it.",
-                    Current = speedScale,
-                })
-                {
-                    Keywords = new[] { "scroll speed", "note speed", "hi-speed", "chunithm", "sdvx", "iidx", "green number", "sekai", "bandori", "arcaea", "djmax", "quaver", "cmod" },
-                },
-                speedSliders[SpeedScale.Mania],
-                speedSliders[SpeedScale.Chunithm],
-                speedSliders[SpeedScale.Sdvx],
-                speedSliders[SpeedScale.Iidx],
-                speedSliders[SpeedScale.Sekai],
-                speedSliders[SpeedScale.BanGDream],
-                speedSliders[SpeedScale.Arcaea],
-                speedSliders[SpeedScale.Djmax],
-                speedSliders[SpeedScale.Quaver],
-                speedSliders[SpeedScale.StepMania],
-                new SettingsItemV2(new FormCheckBox
-                {
-                    Caption = RulesetSettingsStrings.TimingBasedColouring,
-                    Current = config.GetBindable<bool>(ManiaRulesetSetting.TimingBasedNoteColouring),
-                })
-                {
-                    Keywords = new[] { "color" },
-                },
-                // As osu!mania shows it: on screen buttons for each key along the bottom, for touch screens and the mouse.
-                new SettingsItemV2(new FormCheckBox
-                {
-                    Caption = RulesetSettingsStrings.TouchOverlay,
-                    Current = config.GetBindable<bool>(ManiaRulesetSetting.TouchOverlay),
-                }),
-                new SettingsItemV2(new FormCheckBox
-                {
-                    Caption = "Share osu!mania's keys",
-                    HintText = "On: maniaortho plays with the keys bound for osu!mania, and changing keys in either mode's key binding "
-                               + "settings changes both. Off: maniaortho keeps keys of its own, under maniaortho in the key binding "
-                               + "settings, starting from osu!mania's. Turning it back on keeps osu!mania's keys, or maniaortho's for a key "
-                               + "count where osu!mania's are still the defaults.",
-                    Current = shareManiaKeys = highway.GetBindable<bool>(HighwaySetting.ShareManiaKeys),
-                })
-                {
-                    Keywords = new[] { "key bindings", "keybinds", "link", "controls", "osu!mania" },
-                },
-                new SettingsItemV2(new FormEnumDropdown<HighwayPreset>
-                {
-                    Caption = "Highway preset",
-                    HintText = "Chunithm, Voltex (SDVX), Parallel or Classic (osu!mania's layout). Changing any value below makes it Custom.",
-                    Current = highway.GetBindable<HighwayPreset>(HighwaySetting.Preset),
-                })
-                {
-                    Keywords = new[] { "camera", "chunithm", "sdvx", "voltex" },
-                },
-                new SettingsItemV2(new FormEnumDropdown<HighwayCameraMode>
-                {
-                    Caption = "Camera",
-                    Current = highway.GetBindable<HighwayCameraMode>(HighwaySetting.CameraMode),
-                })
-                {
-                    Keywords = new[] { "perspective", "tilt", "flat" },
-                },
-                new SettingsItemV2(new FormSliderBar<float>
-                {
-                    Caption = "Far edge width",
-                    HintText = "Width of the far end of the track compared to the judgement line. Lower is a stronger perspective.",
-                    Current = highway.GetBindable<float>(HighwaySetting.FarWidthRatio),
-                    DisplayAsPercentage = true,
-                    KeyboardStep = 0.01f,
-                }),
-                new SettingsItemV2(new FormEnumDropdown<HighwayWidthMode>
-                {
-                    Caption = "Width by",
-                    HintText = "What sets the Highway track's width: one track width for every key count, as in Chunithm, or a width "
-                               + "per lane, so 4K is narrower than 7K. The default skin's track only: ported skins keep their own lane "
-                               + "widths.",
-                    Current = widthMode = highway.GetBindable<HighwayWidthMode>(HighwaySetting.WidthMode),
-                })
-                {
-                    Keywords = new[] { "lane width", "column width", "track width", "thin", "thick" },
-                },
-                new SettingsItemV2(new FormSliderBar<float>
-                {
-                    Caption = "Track width",
-                    HintText = "Width of the track at the judgement line, as a share of the screen width. A ported skin at \"Skin position "
-                               + "and width\" uses the skin's own width instead. With \"Width by\" on Lane, the Highway track uses the lane "
-                               + "width instead.",
-                    Current = highway.GetBindable<float>(HighwaySetting.TrackWidth),
-                    DisplayAsPercentage = true,
-                    KeyboardStep = 0.01f,
-                }),
-                laneWidthSlider = new SettingsItemV2(new FormSliderBar<float>
-                {
-                    Caption = "Lane width",
-                    HintText = "Width of each lane at the judgement line, as a share of the screen width; the Highway track is that many "
-                               + "lanes wide, up to the whole screen. Ported skins keep their own lane widths.",
-                    Current = highway.GetBindable<float>(HighwaySetting.LaneWidth),
-                    DisplayAsPercentage = true,
-                    KeyboardStep = 0.005f,
-                })
-                {
-                    Keywords = new[] { "column width", "thin", "thick", "lane size" },
-                },
-                new SettingsItemV2(new FormSliderBar<float>
-                {
-                    Caption = "Judgement line height",
-                    HintText = "Distance of the judgement line above the bottom of the screen (lift).",
-                    Current = highway.GetBindable<float>(HighwaySetting.JudgementLineHeight),
-                    DisplayAsPercentage = true,
-                    KeyboardStep = 0.01f,
-                })
-                {
-                    Keywords = new[] { "lift", "hit position" },
-                },
-                new SettingsItemV2(new FormSliderBar<float>
-                {
-                    Caption = "Far edge height",
-                    HintText = "Distance of the far end of the track below the top of the screen.",
-                    Current = highway.GetBindable<float>(HighwaySetting.FarEdgeHeight),
-                    DisplayAsPercentage = true,
-                    KeyboardStep = 0.01f,
-                }),
-                new SettingsItemV2(new FormEnumDropdown<WallScale>
-                {
-                    Caption = "Wall scale",
-                    HintText = "The units the wall is set in and moved by in gameplay: a percent of the track, Chunithm's field wall "
-                               + "steps, IIDX's white number, or osu!mania's and Quaver's lane cover. Choosing a game also gives the wall "
-                               + "that game's speed behaviour (below): Chunithm, osu!mania and Quaver keep the speed, IIDX the visible time. "
-                               + "Percent leaves it as it is.",
-                    Current = wallScale,
-                })
-                {
-                    Keywords = new[] { "wall units", "sudden", "white number", "chunithm", "iidx", "quaver", "cover" },
-                },
-                wallSliders[WallScale.Percent],
-                wallSliders[WallScale.Chunithm],
-                wallSliders[WallScale.Iidx],
-                wallSliders[WallScale.Lane],
-                new SettingsItemV2(new FormCheckBox
-                {
-                    Caption = "Wall keeps visible time",
-                    HintText = "On: notes appear at the wall's edge and slow down so they stay visible for the same time. "
-                               + "Off: notes keep their speed and come out from under the wall, which covers them, as in Chunithm.",
-                    Current = highway.GetBindable<bool>(HighwaySetting.WallKeepsVisibleTime),
-                }),
-                new SettingsItemV2(new FormSliderBar<float>
-                {
-                    Caption = "Far fade",
-                    HintText = "Notes fade in over this share of the visible track, down from the far edge or the wall, instead of "
-                               + "appearing at full strength. Off in Chunithm and SDVX. Highway and Skin (ported) notes only, not under the "
-                               + "flat camera; Hidden and Fade In still apply on top.",
-                    Current = highway.GetBindable<float>(HighwaySetting.FarFade),
-                    DisplayAsPercentage = true,
-                    KeyboardStep = 0.01f,
-                })
-                {
-                    Keywords = new[] { "fade in", "appear", "yarg" },
-                },
-                new SettingsItemV2(new FormCheckBox
-                {
-                    Caption = "Lane guides",
-                    HintText = "Thin lines along the lane boundaries that fade into the distance, as in Chunithm.",
-                    Current = highway.GetBindable<bool>(HighwaySetting.LaneGuides),
-                })
-                {
-                    Keywords = new[] { "guidelines", "dividers", "column lines" },
-                },
-                new SettingsItemV2(new FormCheckBox
-                {
-                    Caption = "Use skin hit target",
-                    HintText = "On: the skin's hit target marks the judgement line. Off: a Chunithm-style judgement line does.",
-                    Current = highway.GetBindable<bool>(HighwaySetting.SkinHitTarget),
-                })
-                {
-                    Keywords = new[] { "judgement line", "receptor", "stage hint" },
-                },
+                new SettingsGroupHeader("maniaortho", true),
+                new SettingsGroupHeader("Notes"),
                 new SettingsItemV2(new FormEnumDropdown<HighwayNoteStyle>
                 {
                     Caption = "Notes",
@@ -394,17 +231,6 @@ namespace osu.Game.Rulesets.ManiaOrtho
                 },
                 new SettingsItemV2(new FormSliderBar<float>
                 {
-                    Caption = "Note thickness",
-                    HintText = "How deep Highway notes are, as a share of the track's length. Chunithm's notes are 2.55%.",
-                    Current = highway.GetBindable<float>(HighwaySetting.NoteThickness),
-                    DisplayAsPercentage = true,
-                    KeyboardStep = 0.0005f,
-                })
-                {
-                    Keywords = new[] { "note size", "note height" },
-                },
-                new SettingsItemV2(new FormSliderBar<float>
-                {
                     Caption = "Hold opacity",
                     HintText = "How solid hold note bodies are, so notes and the track show through long holds. Their heads and tails "
                                + "stay solid. Highway and Skin (ported) notes only.",
@@ -415,17 +241,33 @@ namespace osu.Game.Rulesets.ManiaOrtho
                 {
                     Keywords = new[] { "long note", "ln", "transparency", "hold body", "sekai" },
                 },
-                new SettingsItemV2(new FormEnumDropdown<HighwayHitEffectStyle>
+                new SettingsItemV2(new FormCheckBox
                 {
-                    Caption = "Hit effects",
-                    HintText = "Highway: bursts on the track at the judgement line, gold for Perfect and orange for Great, that also "
-                               + "light the lane's piece of the line, and a glow while you hold a note. Skin (ported): your skin's hit and "
-                               + "hold lighting, upright at the line. Skin (warped): your skin's hit explosions, tilted with the track.",
-                    Current = highway.GetBindable<HighwayHitEffectStyle>(HighwaySetting.HitEffects),
+                    Caption = "Use skin hit target",
+                    HintText = "On: the skin's hit target marks the judgement line. Off: a Chunithm-style judgement line does.",
+                    Current = highway.GetBindable<bool>(HighwaySetting.SkinHitTarget),
                 })
                 {
-                    Keywords = new[] { "hit lighting", "explosion", "burst", "glow" },
+                    Keywords = new[] { "judgement line", "receptor", "stage hint" },
                 },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = RulesetSettingsStrings.TimingBasedColouring,
+                    Current = config.GetBindable<bool>(ManiaRulesetSetting.TimingBasedNoteColouring),
+                })
+                {
+                    Keywords = new[] { "color" },
+                },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = "Lane guides",
+                    HintText = "Thin lines along the lane boundaries that fade into the distance, as in Chunithm.",
+                    Current = highway.GetBindable<bool>(HighwaySetting.LaneGuides),
+                })
+                {
+                    Keywords = new[] { "guidelines", "dividers", "column lines" },
+                },
+                new SettingsGroupHeader("Track and effects"),
                 new SettingsItemV2(new FormEnumDropdown<HighwayTrackStyle>
                 {
                     Caption = "Track",
@@ -450,6 +292,17 @@ namespace osu.Game.Rulesets.ManiaOrtho
                 {
                     Keywords = new[] { "lane transparency", "lane opacity", "floor", "background", "brightness", "sekai" },
                 },
+                new SettingsItemV2(new FormEnumDropdown<HighwayHitEffectStyle>
+                {
+                    Caption = "Hit effects",
+                    HintText = "Highway: bursts on the track at the judgement line, gold for Perfect and orange for Great, that also "
+                               + "light the lane's piece of the line, and a glow while you hold a note. Skin (ported): your skin's hit and "
+                               + "hold lighting, upright at the line. Skin (warped): your skin's hit explosions, tilted with the track.",
+                    Current = highway.GetBindable<HighwayHitEffectStyle>(HighwaySetting.HitEffects),
+                })
+                {
+                    Keywords = new[] { "hit lighting", "explosion", "burst", "glow" },
+                },
                 new SettingsItemV2(new FormEnumDropdown<KeyBeamLength>
                 {
                     Caption = "Key beam",
@@ -461,6 +314,32 @@ namespace osu.Game.Rulesets.ManiaOrtho
                 {
                     Keywords = new[] { "beam", "lane beam", "key beam", "lighting", "djmax", "iidx", "length" },
                 },
+                new SettingsItemV2(new FormSliderBar<float>
+                {
+                    Caption = "Far fade",
+                    HintText = "Notes fade in over this share of the visible track, down from the far edge or the wall, instead of "
+                               + "appearing at full strength. Off in Chunithm and SDVX. Highway and Skin (ported) notes only, not under the "
+                               + "flat camera; Hidden and Fade In still apply on top.",
+                    Current = highway.GetBindable<float>(HighwaySetting.FarFade),
+                    DisplayAsPercentage = true,
+                    KeyboardStep = 0.01f,
+                })
+                {
+                    Keywords = new[] { "fade in", "appear", "yarg" },
+                },
+                new SettingsItemV2(new FormSliderBar<float>
+                {
+                    Caption = "Kiai sway",
+                    HintText = "Off by default. In kiai sections the far end of the track swings from side to side with the beat; the "
+                               + "judgement line and everything below it stay still. Purely cosmetic.",
+                    Current = highway.GetBindable<float>(HighwaySetting.KiaiSway),
+                    DisplayAsPercentage = true,
+                    KeyboardStep = 0.01f,
+                })
+                {
+                    Keywords = new[] { "camera motion", "sway", "kiai", "shake", "movement" },
+                },
+                new SettingsGroupHeader("Skin layout"),
                 new SettingsItemV2(new FormEnumDropdown<SkinKeyArea>
                 {
                     Caption = "Skin key area",
@@ -511,24 +390,175 @@ namespace osu.Game.Rulesets.ManiaOrtho
                 {
                     Caption = "Skin note proportions",
                     HintText = "On: ported notes are as tall at the judgement line, for their width, as your skin draws them. Off: they "
-                               + "use the note thickness above.",
+                               + "use the game preset's note thickness.",
                     Current = highway.GetBindable<bool>(HighwaySetting.SkinNoteProportions),
                 })
                 {
                     Keywords = new[] { "note height", "note size", "thickness" },
                 },
+                new SettingsGroupHeader("Input"),
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = "Share osu!mania's keys",
+                    HintText = "On: maniaortho plays with the keys bound for osu!mania, and changing keys in either mode's key binding "
+                               + "settings changes both. Off: maniaortho keeps keys of its own, under maniaortho in the key binding "
+                               + "settings, starting from osu!mania's. Turning it back on keeps osu!mania's keys, or maniaortho's for a key "
+                               + "count where osu!mania's are still the defaults.",
+                    Current = shareManiaKeys = highway.GetBindable<bool>(HighwaySetting.ShareManiaKeys),
+                })
+                {
+                    Keywords = new[] { "key bindings", "keybinds", "link", "controls", "osu!mania" },
+                },
+                // As osu!mania shows it: on screen buttons for each key along the bottom, for touch screens and the mouse.
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = RulesetSettingsStrings.TouchOverlay,
+                    Current = config.GetBindable<bool>(ManiaRulesetSetting.TouchOverlay),
+                }),
+                new SettingsGroupHeader("Game preset", true),
+                new SettingsItemV2(new FormEnumDropdown<HighwayPreset>
+                {
+                    Caption = "Game preset",
+                    HintText = "Plays like a game's own screen: its camera, judgement line, lane or stage width and note thickness, and "
+                               + "shows the speed and the wall in its numbers. Chunithm, SDVX and Project Sekai are tilted highways; IIDX, "
+                               + "DJMAX, Quaver and StepMania are straight-on; osu!mania is its own stage, unchanged. SDVX, Project Sekai, "
+                               + "DJMAX and osu!mania have no wall, so its settings are hidden. Changing the look below makes it Custom.",
+                    Current = preset = highway.GetBindable<HighwayPreset>(HighwaySetting.Preset),
+                })
+                {
+                    Keywords = new[]
+                    {
+                        "highway preset", "camera", "chunithm", "sdvx", "voltex", "project sekai", "colorful stage", "iidx", "djmax", "quaver", "stepmania",
+                        "osu!mania"
+                    },
+                },
+                new SettingsGroupHeader("Speed"),
+                new SettingsItemV2(new FormEnumDropdown<SpeedScale>
+                {
+                    Caption = "Speed scale",
+                    HintText = "The numbers the speed is set in: osu!mania's scroll speed, or another game's own speed, each giving the "
+                               + "time that game gives notes. Only the numbers change: the speed is one setting, so switching keeps it.",
+                    Current = speedScale,
+                })
+                {
+                    Keywords = new[] { "scroll speed", "note speed", "hi-speed", "chunithm", "sdvx", "iidx", "green number", "sekai", "bandori", "arcaea", "djmax", "quaver", "cmod" },
+                },
+                speedSliders[SpeedScale.Mania],
+                speedSliders[SpeedScale.Chunithm],
+                speedSliders[SpeedScale.Sdvx],
+                speedSliders[SpeedScale.Iidx],
+                speedSliders[SpeedScale.Sekai],
+                speedSliders[SpeedScale.BanGDream],
+                speedSliders[SpeedScale.Arcaea],
+                speedSliders[SpeedScale.Djmax],
+                speedSliders[SpeedScale.Quaver],
+                speedSliders[SpeedScale.StepMania],
+                new SettingsGroupHeader("Camera"),
+                new SettingsItemV2(new FormEnumDropdown<HighwayCameraMode>
+                {
+                    Caption = "Camera",
+                    Current = highway.GetBindable<HighwayCameraMode>(HighwaySetting.CameraMode),
+                })
+                {
+                    Keywords = new[] { "perspective", "tilt", "flat" },
+                },
                 new SettingsItemV2(new FormSliderBar<float>
                 {
-                    Caption = "Kiai sway",
-                    HintText = "Off by default. In kiai sections the far end of the track swings from side to side with the beat; the "
-                               + "judgement line and everything below it stay still. Purely cosmetic.",
-                    Current = highway.GetBindable<float>(HighwaySetting.KiaiSway),
+                    Caption = "Far edge width",
+                    HintText = "Width of the far end of the track compared to the judgement line. Lower is a stronger perspective.",
+                    Current = highway.GetBindable<float>(HighwaySetting.FarWidthRatio),
+                    DisplayAsPercentage = true,
+                    KeyboardStep = 0.01f,
+                }),
+                new SettingsItemV2(new FormSliderBar<float>
+                {
+                    Caption = "Judgement line height",
+                    HintText = "Distance of the judgement line above the bottom of the screen (lift).",
+                    Current = highway.GetBindable<float>(HighwaySetting.JudgementLineHeight),
                     DisplayAsPercentage = true,
                     KeyboardStep = 0.01f,
                 })
                 {
-                    Keywords = new[] { "camera motion", "sway", "kiai", "shake", "movement" },
+                    Keywords = new[] { "lift", "hit position" },
                 },
+                new SettingsItemV2(new FormSliderBar<float>
+                {
+                    Caption = "Far edge height",
+                    HintText = "Distance of the far end of the track below the top of the screen.",
+                    Current = highway.GetBindable<float>(HighwaySetting.FarEdgeHeight),
+                    DisplayAsPercentage = true,
+                    KeyboardStep = 0.01f,
+                }),
+                new SettingsGroupHeader("Lane and note size"),
+                new SettingsItemV2(new FormEnumDropdown<HighwayWidthMode>
+                {
+                    Caption = "Width by",
+                    HintText = "What sets the Highway track's width: one track width for every key count, as in Chunithm, or a width "
+                               + "per lane, so 4K is narrower than 7K. The default skin's track only: ported skins keep their own lane "
+                               + "widths.",
+                    Current = widthMode = highway.GetBindable<HighwayWidthMode>(HighwaySetting.WidthMode),
+                })
+                {
+                    Keywords = new[] { "lane width", "column width", "track width", "thin", "thick" },
+                },
+                new SettingsItemV2(new FormSliderBar<float>
+                {
+                    Caption = "Track width",
+                    HintText = "Width of the track at the judgement line, as a share of the screen width. A ported skin at \"Skin position "
+                               + "and width\" uses the skin's own width instead. With \"Width by\" on Lane, the Highway track uses the lane "
+                               + "width instead.",
+                    Current = highway.GetBindable<float>(HighwaySetting.TrackWidth),
+                    DisplayAsPercentage = true,
+                    KeyboardStep = 0.01f,
+                }),
+                laneWidthSlider = new SettingsItemV2(new FormSliderBar<float>
+                {
+                    Caption = "Lane width",
+                    HintText = "Width of each lane at the judgement line, as a share of the screen width; the Highway track is that many "
+                               + "lanes wide, up to the whole screen. Ported skins keep their own lane widths.",
+                    Current = highway.GetBindable<float>(HighwaySetting.LaneWidth),
+                    DisplayAsPercentage = true,
+                    KeyboardStep = 0.005f,
+                })
+                {
+                    Keywords = new[] { "column width", "thin", "thick", "lane size" },
+                },
+                new SettingsItemV2(new FormSliderBar<float>
+                {
+                    Caption = "Note thickness",
+                    HintText = "How tall the default skin's notes are (Highway notes), as a share of the track's length. Chunithm's are 2.55%, "
+                               + "StepMania's arrows 14.4%.",
+                    Current = highway.GetBindable<float>(HighwaySetting.NoteThickness),
+                    DisplayAsPercentage = true,
+                    KeyboardStep = 0.0005f,
+                })
+                {
+                    Keywords = new[] { "note size", "note height" },
+                },
+                wallHeader = new SettingsGroupHeader("Wall"),
+                wallScaleItem = new SettingsItemV2(new FormEnumDropdown<WallScale>
+                {
+                    Caption = "Wall scale",
+                    HintText = "The units the wall is set in and moved by in gameplay: a percent of the track, Chunithm's field wall "
+                               + "steps, IIDX's white number, or osu!mania's and Quaver's lane cover. Choosing a game also gives the wall "
+                               + "that game's speed behaviour (below): Chunithm, osu!mania and Quaver keep the speed, IIDX the visible time. "
+                               + "Percent leaves it as it is.",
+                    Current = wallScale,
+                })
+                {
+                    Keywords = new[] { "wall units", "sudden", "white number", "chunithm", "iidx", "quaver", "cover" },
+                },
+                wallSliders[WallScale.Percent],
+                wallSliders[WallScale.Chunithm],
+                wallSliders[WallScale.Iidx],
+                wallSliders[WallScale.Lane],
+                wallKeepsVisibleTimeItem = new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = "Wall keeps visible time",
+                    HintText = "On: notes appear at the wall's edge and slow down so they stay visible for the same time. "
+                               + "Off: notes keep their speed and come out from under the wall, which covers them, as in Chunithm.",
+                    Current = highway.GetBindable<bool>(HighwaySetting.WallKeepsVisibleTime),
+                }),
             };
         }
 
@@ -578,16 +608,12 @@ namespace osu.Game.Rulesets.ManiaOrtho
             iidxWall.BindValueChanged(e => setWall(WallScale.Iidx, e.NewValue));
             laneWall.BindValueChanged(e => setWall(WallScale.Lane, (int)Math.Round(e.NewValue * 100)));
 
-            wallScale.BindValueChanged(e =>
+            wallScale.BindValueChanged(_ =>
             {
-                foreach (var (scale, slider) in wallSliders)
-                {
-                    slider.CanBeShown.Value = scale == e.NewValue;
-                    slider.Alpha = scale == e.NewValue ? 1 : 0;
-                }
-
+                showWallSettings();
                 showWallInOtherScales(null);
             }, true);
+            preset.BindValueChanged(_ => showWallSettings(), true);
             showVisibleTimeOnChange(highway.GetBindable<bool>(HighwaySetting.WallKeepsVisibleTime));
             showVisibleTimeOnChange(highway.GetBindable<HighwayCameraMode>(HighwaySetting.CameraMode));
 
@@ -598,6 +624,27 @@ namespace osu.Game.Rulesets.ManiaOrtho
 
             if (skin != null)
                 skin.SourceChanged += showVisibleTime;
+        }
+
+        /// <summary>
+        /// Shows the wall's settings only for a game with a wall, and of the wall sliders only the chosen scale's.
+        /// </summary>
+        private void showWallSettings()
+        {
+            bool hasWall = HighwayPresets.HasWall(preset.Value);
+
+            wallHeader.Alpha = hasWall ? 1 : 0;
+            show(wallScaleItem, hasWall);
+            show(wallKeepsVisibleTimeItem, hasWall);
+
+            foreach (var (scale, slider) in wallSliders)
+                show(slider, hasWall && scale == wallScale.Value);
+
+            static void show(SettingsItemV2 item, bool visible)
+            {
+                item.CanBeShown.Value = visible;
+                item.Alpha = visible ? 1 : 0;
+            }
         }
 
         private void showWallInOtherScalesOnChange<T>(IBindable<T> input)

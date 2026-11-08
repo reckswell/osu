@@ -204,12 +204,36 @@ namespace osu.Game.Rulesets.ManiaOrtho.Highway
         SkinLayout,
     }
 
+    /// <summary>
+    /// A game's look (Alpha 2026-11-08: presets by game, each with its own lane width, note thickness and speed numbers;
+    /// research/topic-presets-by-game.md). Stored by name, so members can be reordered.
+    /// </summary>
     public enum HighwayPreset
     {
         Chunithm,
+
+        [Description("SDVX")]
         Voltex,
-        Parallel,
+
+        [Description("Project Sekai")]
+        Sekai,
+
+        [Description("beatmania IIDX")]
+        Iidx,
+
+        [Description("DJMAX")]
+        Djmax,
+
+        Quaver,
+
+        StepMania,
+
+        [Description("osu!mania")]
         Classic,
+
+        [Description("Parallel tilt")]
+        Parallel,
+
         Custom,
     }
 
@@ -246,9 +270,9 @@ namespace osu.Game.Rulesets.ManiaOrtho.Highway
         public float TrackWidth { get; init; }
 
         /// <summary>
-        /// Whether <see cref="TrackWidth"/> or <see cref="LaneWidth"/> sets the track's width. A preference outside the presets,
-        /// for the highway's own track only: a ported skin's track keeps its own widths, or <see cref="TrackWidth"/> at "Skin
-        /// position", and the warped skin stage keeps <see cref="TrackWidth"/>.
+        /// Whether <see cref="TrackWidth"/> or <see cref="LaneWidth"/> sets the track's width. Part of a game's look (IIDX and
+        /// StepMania are set by lane), for the highway's own track only: a ported skin's track keeps its own widths, or
+        /// <see cref="TrackWidth"/> at "Skin position", and the warped skin stage keeps <see cref="TrackWidth"/>.
         /// </summary>
         public HighwayWidthMode WidthMode { get; init; }
 
@@ -292,6 +316,11 @@ namespace osu.Game.Rulesets.ManiaOrtho.Highway
         /// thick near the line under SDVX's camera as under Chunithm's.
         /// </summary>
         public float NoteThickness { get; init; }
+
+        /// <summary>
+        /// The thickest notes can be set: StepMania's square arrows are 14.4% of its lane.
+        /// </summary>
+        public const float MAX_NOTE_THICKNESS = 0.15f;
 
         /// <summary>
         /// When true (default), moving the wall keeps the visible time: notes slow down on the track. When false, notes keep
@@ -495,22 +524,106 @@ namespace osu.Game.Rulesets.ManiaOrtho.Highway
                         JudgementLineHeight = 0.074f,
                         FarEdgeHeight = 0,
                         TrackWidth = 0.61f,
+                        SpeedScale = SpeedScale.Chunithm,
+                        WallScale = WallScale.Chunithm,
                     };
 
                 case HighwayPreset.Voltex:
                     // The default camera of the open-source SDVX clone USC in a landscape window, projected
                     // (research/game-sdvx.md P1; no arcade frame could be measured): judgement line 5.9% above the bottom,
-                    // highway 0.435 of the screen wide there, far/near width 0.106. Its far edge sits 28% below the top;
-                    // here it is stretched to the top edge, as for Chunithm (QUESTIONS Q7). Notes 1.25% of the track
-                    // deep, USC's note depth: at 2.55% this camera draws them twice Chunithm's height near the line.
+                    // highway 0.435 of the screen wide there, far/near width 0.106, its far edge 28.4% below the top: notes
+                    // come from towards the middle of the screen, not the top (Alpha 2026-11-08, QUESTIONS Q7). Notes 1.25% of
+                    // the track deep, USC's note depth: at 2.55% this camera draws them twice Chunithm's height near the line.
                     return new HighwaySettings
                     {
                         CameraMode = HighwayCameraMode.Perspective,
                         FarWidthRatio = 0.106f,
                         JudgementLineHeight = 0.059f,
-                        FarEdgeHeight = 0,
+                        FarEdgeHeight = 0.284f,
                         TrackWidth = 0.435f,
                         NoteThickness = 0.0125f,
+                        SpeedScale = SpeedScale.Sdvx,
+                    };
+
+                case HighwayPreset.Sekai:
+                    // The fan engine's stage (research/game-sekai.md): judgement line 20.9% above the bottom, high for the thumbs,
+                    // 0.787 of the screen wide there, the lane reaching the top edge, notes 3.4% of the visible time thick. Its
+                    // far/near width is 0.073 where notes appear, but its notes approach on an exponential curve; on this
+                    // perspective, linear in depth, that ratio would make them about 188 times faster at the line than at the
+                    // far edge. 0.18 makes it 31 times, as the engine's alternative approach curve does (30), until the approach
+                    // options can draw Sekai's own curve. Notes are as tall at the line as Sekai's, 7.4% of the screen (its 3.4%
+                    // of the visible time holds only on its curve).
+                    return new HighwaySettings
+                    {
+                        CameraMode = HighwayCameraMode.Perspective,
+                        FarWidthRatio = 0.18f,
+                        JudgementLineHeight = 0.209f,
+                        FarEdgeHeight = 0,
+                        TrackWidth = 0.787f,
+                        NoteThickness = 0.0185f,
+                        SpeedScale = SpeedScale.Sekai,
+                    };
+
+                // The 2D games (research/topic-presets-by-game.md): a straight-on track (parallel lanes, no foreshortening),
+                // their judgement line, lane or stage width and note height, and their speed and cover numbers. Note
+                // thickness is the note's height over the distance from the line to where notes appear.
+
+                case HighwayPreset.Iidx:
+                    // Lanes 3.6% of the screen each (beatoraja's skin: white keys 3.9%, black 3.1%; no scratch lane in
+                    // mania maps), notes 2.1% of the lane. The line is high, above the keys and turntable graphic: 33% up,
+                    // estimated from KONAMI's 723 px lane (beatoraja puts it at 19%).
+                    return new HighwaySettings
+                    {
+                        CameraMode = HighwayCameraMode.ParallelTilt,
+                        FarWidthRatio = 1,
+                        JudgementLineHeight = 0.33f,
+                        WidthMode = HighwayWidthMode.Lane,
+                        LaneWidth = 0.036f,
+                        NoteThickness = 0.021f,
+                        SpeedScale = SpeedScale.Iidx,
+                        WallScale = WallScale.Iidx,
+                    };
+
+                case HighwayPreset.Djmax:
+                    // Estimates from a fan calculator's constants: the gear 26% of the screen wide whatever the button
+                    // count, the line 30% up, notes 3.5% of the lane.
+                    return new HighwaySettings
+                    {
+                        CameraMode = HighwayCameraMode.ParallelTilt,
+                        FarWidthRatio = 1,
+                        JudgementLineHeight = 0.30f,
+                        TrackWidth = 0.26f,
+                        NoteThickness = 0.035f,
+                        SpeedScale = SpeedScale.Djmax,
+                    };
+
+                case HighwayPreset.Quaver:
+                    // The default "Bar" skin at 4K (its 7K stage is 30% wide, notes 3.4%): stage 25% of the screen wide,
+                    // line 12% up, notes 4.9% of the lane.
+                    return new HighwaySettings
+                    {
+                        CameraMode = HighwayCameraMode.ParallelTilt,
+                        FarWidthRatio = 1,
+                        JudgementLineHeight = 0.12f,
+                        TrackWidth = 0.25f,
+                        NoteThickness = 0.049f,
+                        SpeedScale = SpeedScale.Quaver,
+                        WallScale = WallScale.Lane,
+                    };
+
+                case HighwayPreset.StepMania:
+                    // Reverse (receptors at the bottom), as this ruleset scrolls: 64 px arrows in 7.5% wide lanes, receptors
+                    // 15.8% up, arrows 14.4% of the lane (square, so much taller than bar notes).
+                    return new HighwaySettings
+                    {
+                        CameraMode = HighwayCameraMode.ParallelTilt,
+                        FarWidthRatio = 1,
+                        JudgementLineHeight = 0.158f,
+                        WidthMode = HighwayWidthMode.Lane,
+                        LaneWidth = 0.075f,
+                        NoteThickness = 0.144f,
+                        SpeedScale = SpeedScale.StepMania,
+                        WallScale = WallScale.Lane,
                     };
 
                 case HighwayPreset.Parallel:
@@ -524,11 +637,25 @@ namespace osu.Game.Rulesets.ManiaOrtho.Highway
                     };
 
                 case HighwayPreset.Classic:
+                    // osu!mania's own stage, unchanged: the skin's lane widths, notes and line.
                     return new HighwaySettings { CameraMode = HighwayCameraMode.Flat };
 
                 default:
                     throw new ArgumentOutOfRangeException(nameof(preset), preset, "Custom has no fixed values.");
             }
         }
+
+        /// <summary>
+        /// Whether the game has a wall or lane cover to set (Alpha 2026-11-08: SDVX and Project Sekai have none). Under a preset
+        /// with one the wall is the player's, as speed is; under one without, the wall is down and its settings are hidden, and
+        /// raising it anyway (Shift with the speed keys) makes the preset Custom.
+        /// </summary>
+        public static bool HasWall(HighwayPreset preset) => preset switch
+        {
+            // DJMAX hides notes only with fixed Fader patterns (research/game-djmax.md); osu!mania's covers are mods, and its
+            // flat stage has no wall.
+            HighwayPreset.Voltex or HighwayPreset.Sekai or HighwayPreset.Djmax or HighwayPreset.Classic => false,
+            _ => true,
+        };
     }
 }

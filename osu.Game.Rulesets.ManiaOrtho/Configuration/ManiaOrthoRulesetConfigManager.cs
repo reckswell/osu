@@ -97,10 +97,17 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
         {
             var preset = GetOriginalBindable<HighwayPreset>(HighwaySetting.Preset);
 
-            // A named preset always shows its current values, so tuning a preset in code reaches everyone using it.
+            keepWidthByLane(preset);
+
+            // A named preset always shows its current values, so tuning a preset in code reaches everyone using it. Its
+            // game's numbers (speed and wall scales) are set when it is chosen, and stay as the player leaves them.
             ApplyPreset(preset.Value);
 
-            preset.ValueChanged += e => ApplyPreset(e.NewValue);
+            preset.ValueChanged += e =>
+            {
+                ApplyPreset(e.NewValue);
+                ApplyPresetScales(e.NewValue);
+            };
 
             // Changing any value by hand turns the preset into "Custom".
             GetOriginalBindable<HighwayCameraMode>(HighwaySetting.CameraMode).ValueChanged += _ => onPresetValueChanged();
@@ -110,10 +117,12 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
             GetOriginalBindable<float>(HighwaySetting.TrackWidth).ValueChanged += _ => onPresetValueChanged();
             GetOriginalBindable<float>(HighwaySetting.Wall).ValueChanged += _ => onPresetValueChanged();
             GetOriginalBindable<float>(HighwaySetting.NoteThickness).ValueChanged += _ => onPresetValueChanged();
+            GetOriginalBindable<HighwayWidthMode>(HighwaySetting.WidthMode).ValueChanged += _ => onPresetValueChanged();
+            GetOriginalBindable<float>(HighwaySetting.LaneWidth).ValueChanged += _ => onPresetValueChanged();
 
             void onPresetValueChanged()
             {
-                if (!applyingPreset && preset.Value != HighwayPreset.Custom && !matches(HighwayPresets.Get(preset.Value)))
+                if (!applyingPreset && preset.Value != HighwayPreset.Custom && !matches(preset.Value))
                     preset.Value = HighwayPreset.Custom;
             }
 
@@ -121,12 +130,46 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
             // speed, IIDX the visible time); the toggle can still be changed afterwards.
             GetOriginalBindable<WallScale>(HighwaySetting.WallScale).ValueChanged += e =>
             {
-                if (WallScales.KeepsVisibleTime(e.NewValue) is bool keepsVisibleTime)
+                if (!applyingPreset && WallScales.KeepsVisibleTime(e.NewValue) is bool keepsVisibleTime)
                     SetValue(HighwaySetting.WallKeepsVisibleTime, keepsVisibleTime);
             };
 
             ApplySkinPortDefaults();
             applySkinLayoutDefault();
+            applyPresetScalesOnce();
+        }
+
+        /// <summary>
+        /// Once per install, when presets started to carry their game's numbers (Alpha 2026-11-08): the preset in use sets its
+        /// speed and wall scales, as choosing it now does. Custom changes nothing.
+        /// </summary>
+        /// <summary>
+        /// Once, on an install from before presets set the width (Alpha 2026-11-08): "Width by" Lane was a preference outside
+        /// the presets then, and every preset is "Width by" Track or has its own lane width now. Applying the preset would
+        /// throw the player's lane width away, so such an install moves to Custom and keeps it. Runs before the scales'
+        /// once-per-install step marks the install as done.
+        /// </summary>
+        private void keepWidthByLane(Bindable<HighwayPreset> preset)
+        {
+            if (GetOriginalBindable<bool>(HighwaySetting.PresetScalesApplied).Value || preset.Value == HighwayPreset.Custom)
+                return;
+
+            var values = HighwayPresets.Get(preset.Value);
+
+            if (Get<HighwayWidthMode>(HighwaySetting.WidthMode) != values.WidthMode
+                || (values.WidthMode == HighwayWidthMode.Lane && !near(Get<float>(HighwaySetting.LaneWidth), values.LaneWidth)))
+                preset.Value = HighwayPreset.Custom;
+        }
+
+        private void applyPresetScalesOnce()
+        {
+            var applied = GetOriginalBindable<bool>(HighwaySetting.PresetScalesApplied);
+
+            if (applied.Value)
+                return;
+
+            ApplyPresetScales(Get<HighwayPreset>(HighwaySetting.Preset));
+            applied.Value = true;
         }
 
         /// <summary>
@@ -187,7 +230,7 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
             SetDefault(HighwaySetting.TrackWidth, defaults.TrackWidth, 0.2f, 1f, precision);
             // Fine enough for every scale's units (a white number is a thousandth of the lane on screen).
             SetDefault(HighwaySetting.Wall, defaults.Wall, 0f, HighwayScroll.MAX_WALL, 0.0001f);
-            SetDefault(HighwaySetting.NoteThickness, defaults.NoteThickness, 0.005f, 0.08f, 0.0005f);
+            SetDefault(HighwaySetting.NoteThickness, defaults.NoteThickness, 0.005f, HighwaySettings.MAX_NOTE_THICKNESS, 0.0005f);
             SetDefault(HighwaySetting.WallKeepsVisibleTime, true);
             SetDefault(HighwaySetting.LaneGuides, true);
             SetDefault(HighwaySetting.SkinHitTarget, false);
@@ -211,6 +254,7 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
             SetDefault(HighwaySetting.WidthMode, defaults.WidthMode);
             SetDefault(HighwaySetting.LaneWidth, defaults.LaneWidth, HighwaySettings.MIN_LANE_WIDTH, HighwaySettings.MAX_LANE_WIDTH, 0.001f);
             SetDefault(HighwaySetting.SkinPortDefaultsApplied, false);
+            SetDefault(HighwaySetting.PresetScalesApplied, false);
             SetDefault(HighwaySetting.FineScrollSpeed, 0.0, 0, SpeedScales.MAX_MANIA_SPEED, SpeedScales.MANIA_SPEED_PRECISION);
         }
 
@@ -249,12 +293,14 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
         };
 
         /// <summary>
-        /// Writes a preset's values into the individual settings. Leaves <see cref="HighwaySetting.WallKeepsVisibleTime"/>,
-        /// <see cref="HighwaySetting.LaneGuides"/>, <see cref="HighwaySetting.SkinHitTarget"/>,
-        /// <see cref="HighwaySetting.NoteStyle"/>, <see cref="HighwaySetting.HitEffects"/>, <see cref="HighwaySetting.Track"/>,
-        /// <see cref="HighwaySetting.FarFade"/>, <see cref="HighwaySetting.HoldOpacity"/>, <see cref="HighwaySetting.TrackOpacity"/>,
-        /// <see cref="HighwaySetting.KeyBeam"/>, <see cref="HighwaySetting.KiaiSway"/>, <see cref="HighwaySetting.WallScale"/> and the
-        /// skin porter's settings alone (preferences, not part of a camera).
+        /// Writes a preset's look into the individual settings: camera, width, line and note thickness, and takes the wall
+        /// down for a game without one (a game with one leaves it to the player). Leaves
+        /// <see cref="HighwaySetting.WallKeepsVisibleTime"/>, <see cref="HighwaySetting.LaneGuides"/>,
+        /// <see cref="HighwaySetting.SkinHitTarget"/>, <see cref="HighwaySetting.NoteStyle"/>, <see cref="HighwaySetting.HitEffects"/>,
+        /// <see cref="HighwaySetting.Track"/>, <see cref="HighwaySetting.FarFade"/>, <see cref="HighwaySetting.HoldOpacity"/>,
+        /// <see cref="HighwaySetting.TrackOpacity"/>, <see cref="HighwaySetting.KeyBeam"/>, <see cref="HighwaySetting.KiaiSway"/> and
+        /// the skin porter's settings alone (preferences, not part of a game's look). The game's speed and wall scales are
+        /// <see cref="ApplyPresetScales"/>.
         /// </summary>
         public void ApplyPreset(HighwayPreset preset)
         {
@@ -263,6 +309,7 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
 
             var values = HighwayPresets.Get(preset);
 
+            bool wasApplying = applyingPreset;
             applyingPreset = true;
 
             try
@@ -272,33 +319,79 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
                 SetValue(HighwaySetting.JudgementLineHeight, values.JudgementLineHeight);
                 SetValue(HighwaySetting.FarEdgeHeight, values.FarEdgeHeight);
                 SetValue(HighwaySetting.TrackWidth, values.TrackWidth);
-                SetValue(HighwaySetting.Wall, values.Wall);
                 SetValue(HighwaySetting.NoteThickness, values.NoteThickness);
+                SetValue(HighwaySetting.WidthMode, values.WidthMode);
+                SetValue(HighwaySetting.LaneWidth, values.LaneWidth);
+
+                // A game with a wall leaves it to the player, as the arcade games do; one without takes it down.
+                if (!HighwayPresets.HasWall(preset))
+                    SetValue(HighwaySetting.Wall, 0f);
             }
             finally
             {
-                applyingPreset = false;
+                applyingPreset = wasApplying;
             }
         }
 
-        private bool matches(HighwaySettings preset)
+        /// <summary>
+        /// Shows the speed and the wall in a preset's game's numbers (<see cref="HighwaySettings.SpeedScale"/>,
+        /// <see cref="HighwaySettings.WallScale"/>; the wall's only if the game has one). Display only: the speed, the wall and
+        /// whether it keeps the visible time stay as they are.
+        /// </summary>
+        public void ApplyPresetScales(HighwayPreset preset)
         {
-            var current = Current;
+            if (preset == HighwayPreset.Custom)
+                return;
 
-            // Flat ignores the geometry, so any geometry matches the Classic preset.
+            var values = HighwayPresets.Get(preset);
+
+            SetValue(HighwaySetting.SpeedScale, values.SpeedScale);
+
+            // A game without a wall leaves the wall's units as they are, for the next game with one.
+            if (!HighwayPresets.HasWall(preset))
+                return;
+
+            // The wall's speed behaviour stays the player's (SPEC 4: visible time kept by default), unlike choosing a scale.
+            bool wasApplying = applyingPreset;
+            applyingPreset = true;
+
+            try
+            {
+                SetValue(HighwaySetting.WallScale, values.WallScale);
+            }
+            finally
+            {
+                applyingPreset = wasApplying;
+            }
+        }
+
+        /// <summary>
+        /// Whether the current look is still the preset's. The wall counts only for a game without one (it must stay down); the
+        /// lane width only when the preset sets the width by lane (it is hidden and unused otherwise). The track width always
+        /// counts: ported and warped skin stages use it in every width mode.
+        /// </summary>
+        private bool matches(HighwayPreset presetName)
+        {
+            var preset = HighwayPresets.Get(presetName);
+            var current = Current;
+            bool wallMatches = HighwayPresets.HasWall(presetName) || near(current.Wall, 0);
+
+            // Flat ignores the geometry, so any geometry matches the osu!mania preset.
             if (preset.CameraMode == HighwayCameraMode.Flat)
-                return current.CameraMode == HighwayCameraMode.Flat;
+                return current.CameraMode == HighwayCameraMode.Flat && wallMatches;
 
             return current.CameraMode == preset.CameraMode
                    && near(current.FarWidthRatio, preset.FarWidthRatio)
                    && near(current.JudgementLineHeight, preset.JudgementLineHeight)
                    && near(current.FarEdgeHeight, preset.FarEdgeHeight)
                    && near(current.TrackWidth, preset.TrackWidth)
-                   && near(current.Wall, preset.Wall)
+                   && current.WidthMode == preset.WidthMode
+                   && (preset.WidthMode != HighwayWidthMode.Lane || near(current.LaneWidth, preset.LaneWidth))
+                   && wallMatches
                    && near(current.NoteThickness, preset.NoteThickness);
-
-            static bool near(float a, float b) => Math.Abs(a - b) < 1e-4f;
         }
+
+        private static bool near(float a, float b) => Math.Abs(a - b) < 1e-4f;
     }
 
     public enum HighwaySetting
@@ -355,6 +448,12 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
         /// Not shown: whether <see cref="HighwayConfigManager.ApplySkinPortDefaults"/> has run on this install.
         /// </summary>
         SkinPortDefaultsApplied,
+
+        /// <summary>
+        /// Not shown: whether the preset in use has set its game's speed and wall scales on this install
+        /// (<c>applyPresetScalesOnce</c>, Alpha 2026-11-08).
+        /// </summary>
+        PresetScalesApplied,
 
         /// <summary>
         /// Not shown: osu!mania's scroll speed at maniaortho's precision and range (0 before it is first stored), which

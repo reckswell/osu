@@ -41,9 +41,15 @@ Requirements:
 - Parameters: tilt angle (0-75 deg, default 55 *(tune)*), field of view (30-90 deg, default 60 *(tune)*), far-edge
   width as a fraction of near-edge width (perspective only, derived from tilt/FOV, typically 0.3-0.6), track width at
   the judgement line (fraction of screen width; default from key count, section 5).
-- Presets: **Voltex** (perspective, strong tilt, narrow far end), **Chunithm** (perspective, gentler tilt, wider far
-  end, wall on), **Parallel** (parallel tilt), **Classic** (flat). Preset values come from the research notes and are
-  recorded in `DECISIONS.md`.
+- **Game presets** (Alpha, 2026-11-08: "sort all of the presets by games"): each plays like one game's screen, with its
+  camera, judgement line, lane or stage width and note thickness, and shows the speed and the wall in that game's
+  numbers and steps (§3, §4). Tilted: **Chunithm** (notes from the top edge), **SDVX** (notes from towards the middle,
+  narrow far end), **Project Sekai** (high line, very narrow far end). Straight-on: **beatmania IIDX**, **DJMAX**,
+  **Quaver**, **StepMania**. **osu!mania** is mania's own stage (flat); **Parallel tilt** a neutral parallel camera.
+  Games without a wall or lane cover (SDVX, Project Sekai, DJMAX, osu!mania) have none: the wall is down and its
+  settings hidden. Changing the look by hand makes the preset Custom; the speed, the wall in a game with one, and the
+  numbers they are shown in stay as the player sets them. Values come from the research notes and are recorded in
+  `DECISIONS.md`.
 - No camera motion driven by beatmap data. Optional cosmetic motion (for example a small sway in kiai) is allowed later,
   off by default, and must never move the judgement line.
 

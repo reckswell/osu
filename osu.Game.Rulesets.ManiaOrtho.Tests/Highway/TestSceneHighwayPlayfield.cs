@@ -74,6 +74,7 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Highway
                 highwayConfig.GetBindable<HighwayNoteStyle>(HighwaySetting.NoteStyle).SetDefault();
                 highwayConfig.SetValue(HighwaySetting.Preset, HighwayPreset.Custom);
                 highwayConfig.SetValue(HighwaySetting.Preset, HighwayPreset.Chunithm);
+                highwayConfig.SetValue(HighwaySetting.Wall, 0f); // a game with a wall leaves it to the player
                 highwayConfig.SetValue(HighwaySetting.LaneGuides, true);
                 highwayConfig.SetValue(HighwaySetting.SkinHitTarget, false);
                 highwayConfig.SetValue(HighwaySetting.Track, HighwayTrackStyle.Highway);

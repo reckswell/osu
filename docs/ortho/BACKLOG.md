@@ -196,8 +196,14 @@ Only after Alpha confirms. See the design doc's "Local-only vs self-hosted serve
   playtest (DECISIONS 2026-11-04). Great (orange) and Good (green) slot lights seen in a humanised playtest; Meh (dimmer) only in tests, as seed 4 hits none.
 - [x] Optional cosmetic camera motion (kiai sway), off by default. ("Kiai sway" 0-100%: the track leans about the
   judgement line with the beat in kiai sections; DECISIONS 2026-11-04.)
-- [ ] **[Alpha: Q17]** More presets from research. (No Arcaea preset: Alpha, Q19. The other notes propose none but
-  Sekai's, which waits on Q17; YARG's guitar-game family is a custom recipe, not a preset, `game-yarg-clonehero.md` Y2.)
+- [x] **[Alpha: Q17]** More presets from research. (No Arcaea preset: Alpha, Q19. YARG's guitar-game family is a custom
+  recipe, not a preset, `game-yarg-clonehero.md` Y2.) Done as presets by game, below; Sekai's eased approach comes with
+  the lane tilt thread.
+- [x] Presets by game (Alpha's ask, 2026-11-08): Chunithm, SDVX, Project Sekai, beatmania IIDX, DJMAX, Quaver,
+  StepMania, osu!mania, each with its camera, line, lane or stage width, note thickness, speed scale and wall scale;
+  no wall settings for games without one; "Note thickness" up to 15%; the panel in a maniaortho section and a game preset
+  section (`research/topic-presets-by-game.md`; DECISIONS 2026-11-08). Gate: `TestGamePresets` per preset,
+  `TestSettingsPanel`, playtest captures of each preset.
 - [x] Optional "Key beam" length: Long (today) / Half / Quarter of the track's height on screen, default Long
   (`game-djmax.md` R2). Half and Quarter measured to the wall's edge when there is one (DECISIONS 2026-11-04).
 - [x] Speed in other games' numbers (Alpha's ask, 2026-11-07): "Speed scale" with Chunithm, SDVX, IIDX green number,

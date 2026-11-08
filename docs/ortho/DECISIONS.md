@@ -1303,3 +1303,58 @@ alternatives considered, how to reverse. If a later decision overrides one, add 
 - **Alpha chose** (decision card, 2026-11-08): keep hard links. No core patch; stable's file contents never change, and
   the import's one empty test file in `Songs` is accepted. (A copy patch, `OSU_DISABLE_HARD_LINKS` in
   `osu.Game/IO/HardLinkHelper.cs` with a test, was written and passed, then dropped.)
+
+## 2026-11-08: Presets by game (Alpha)
+
+- **Alpha**: "sort all of the presets by games, which have their own versions of lane width/thickness, approach speed
+  scaling, and all other relevant details", "games like project sekai/sdvx don't have a wall option", "chunithm has
+  chunithm-related settings (eg. note speed in increments of 0.25)", and "above this preset section ... a separate
+  section for orthomania specific settings".
+- **Decision**: the preset is a game: Chunithm, SDVX, Project Sekai, beatmania IIDX, DJMAX, Quaver, StepMania, osu!mania
+  (plus Parallel tilt and Custom). Each sets its look (camera, far edge, line, width mode and track or lane width, note
+  thickness, wall) on load and when chosen, and its numbers (speed scale, wall scale) when chosen and once per install
+  (`PresetScalesApplied`); the numbers then stay as the player leaves them. The settings' defaults follow the default
+  preset, so a fresh install shows Chunithm's numbers. Values per game: `HighwayPresets.Get` and
+  `research/topic-presets-by-game.md`.
+- **Width is part of a game's look** now: changing "Width by", the track width (ported and warped skin stages use it in
+  either mode) or, for a game set by lane, the lane width makes the preset Custom; the hidden lane width of a game set by
+  track does not. An install from before, on a preset with "Width by" Lane, moves to Custom once and keeps its lane width
+  (`keepWidthByLane`) instead of losing it to the preset.
+- **No wall** for SDVX (none in its option guides), Project Sekai (Alpha; the official game's Note Start Point, since
+  2024, works like a speed-keeping cover and is left out), DJMAX (only fixed Fader patterns) and osu!mania (its covers
+  are mods; the flat stage has no wall). Under them the wall is down and its settings are hidden
+  (`HighwayPresets.HasWall`); the wall keys still raise it, which makes the preset Custom. A game without a wall leaves
+  the wall scale as it was.
+- **In a game with a wall, the wall is the player's**, as the speed is: setting it keeps the preset, choosing the preset
+  or starting the game leaves it (before, every wall made the preset Custom, which read wrong once the wall sat in the
+  game's own section; gameplay-reviewer). Choosing a game without one takes it down.
+- **The wall's speed behaviour stays the player's** when a preset sets the wall scale ("Wall keeps visible time", SPEC 4,
+  Q8 unanswered); choosing a scale by hand still sets it. Otherwise choosing Chunithm would turn it off on some installs
+  and not on fresh ones (already on Chunithm's scale).
+- **Speed steps** are each game's: Chunithm 0.25, SDVX 0.01 (keys 0.1), Project Sekai 0.01 (keys 0.1). Alpha wrote
+  "increments of 1" for Sekai; the official game moved to 0.01 steps in April 2024 and most players sit at 10.5-11.3
+  (`game-sekai.md`), so 0.01 until Alpha answers the decision card.
+- **SDVX's far edge** is USC's faithful 0.284 ("sdvx has notes appearing from the center of the screen"; Q7). Its 1.25%
+  notes are then 0.77 of Chunithm's height at the line, as the research's 76 px against 81-98 px.
+- **Project Sekai** has the fan engine's line (20.9% up) and width (0.787), and a stand-in far edge: its far/near width is
+  0.073, but with this linear-depth perspective notes would move about 188 times faster at the line than at the far
+  edge. 0.18 gives 31 times, as the engine's alternative approach curve (30). Notes are 1.85% of the track deep, so they
+  are about Sekai's 7.4% of the screen tall at the line (the playtester measured a held head) (its 3.4% of the visible time holds only on its eased curve; at 3.4%
+  this camera drew them 12.9%, gameplay-reviewer). The lane tilt thread's approach curves (Sekai's eased approach as a
+  choice) replace the stand-in.
+- **Estimates**: IIDX's line 0.33 (from KONAMI's 723 px lane; beatoraja's skin puts it at 0.194) and DJMAX's line 0.30
+  and gear 0.26 (a fan calculator's constants). No arcade frame was measured for either.
+- **Approximations**: Quaver's stage grows only 19% from 4K to 7K, so it is one track width (4K's), not a lane width; its
+  cover is a share of the screen, shown in osu!mania's "% of the lane" units. StepMania uses SM5's CMod constant
+  (Etterna's themes would need 378,750 / C). "Note thickness" now goes to 15% for StepMania's square 14.4% arrows. The
+  osu!mania preset stays mania's exact stage.
+- **Known limits at 7K** (playtester): a preset has one size for every key count. Quaver's 7K stage is 30% wide with
+  3.4% notes, so its 4K values make near-square 7K notes; StepMania's 7.5% lanes with argon's double centre lane make a
+  7K track 60% of the screen, which osu!'s score panel and key counter overlap at the edges. Per-key-count sizes would
+  fix both; left for when Alpha plays them. IIDX and DJMAX keep empty lanes below their high line, as mania does; their
+  key or gear panel there is a possible look later.
+- **Left out**: BanG Dream! (its approach is eased like Sekai's; with the approach curves) and Arcaea (Alpha, Q19).
+- **Menu**: a "maniaortho" section (Notes, Track and effects, Skin layout, Input), then a "Game preset" section (the
+  preset, Speed, Camera, Lane and note size, Wall). Headings hide while searching unless their own name matches.
+- **Reverse**: `HighwayPresets.HasWall` returning true shows the wall everywhere; the speed scale's dropdown stays, so
+  any game's numbers can be used with any preset.

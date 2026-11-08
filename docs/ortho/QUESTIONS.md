@@ -83,7 +83,9 @@ SPEC 2 and Alpha's brief say notes come from the top of the screen.
   just above it (USC's camera, `research/game-sdvx.md` P1). Stretching it to the top edge, as now, flattens the lanes'
   lean from 28 to 20 degrees and makes notes rush about 43% faster near the line. The Voltex preset follows whatever
   Q7 resolves to; the research recommends the faithful edge (0.284) for Voltex.
-- **Answer**:
+- **Answer** (Alpha, 2026-11-08, presets by game): (a) for Chunithm ("a consistent projection of notes from the top of
+  the screen to the bottom"); SDVX's notes come "from the center of the screen", so Voltex has USC's faithful far edge,
+  0.284. The lane tilt thread's camera (tilt, lane length, field of view) refines both.
 
 ### Q8. Wall behaviour in the Chunithm preset
 In the arcade the field wall is off by default, goes up to about 90% of the track, and keeps note speed (visible time
@@ -145,6 +147,10 @@ speed difference). `research/game-sekai.md` K2 has the values and the curve (it 
   Linear / Eased" setting on every preset; (c) no Sekai preset.
 - **Default until answered**: nothing is built. If (a) or (b), Chunithm (linear) and Sekai (eased) captures at 405 ms,
   4K and 7K come first.
+- **Answer** (Alpha, 2026-11-08): a Project Sekai preset, with its own speed numbers and no wall; the approach curves
+  ("different angular projections so the user can customize the way notes approach") come from the lane tilt thread,
+  as a choice on every preset, so (b). Until then the Sekai preset is linear with a wider far edge (DECISIONS
+  2026-11-08, "Presets by game").
 - **Answer**:
 
 ### Q18. Replays of your maniaortho plays
