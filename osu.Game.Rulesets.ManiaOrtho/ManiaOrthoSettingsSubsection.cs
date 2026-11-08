@@ -723,7 +723,7 @@ namespace osu.Game.Rulesets.ManiaOrtho
         {
             bool hasWall = HighwayPresets.HasWall(preset.Value);
 
-            wallGroup.Alpha = hasWall ? 1 : 0;
+            wallGroup.CanBeShown.Value = hasWall;
             show(wallScaleItem, hasWall);
             show(wallKeepsVisibleTimeItem, hasWall);
 

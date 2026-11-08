@@ -209,7 +209,10 @@ Only after Alpha confirms. See the design doc's "Local-only vs self-hosted serve
   "Game preset" (the game, Speed, Lane and camera, Lane and note size, Wall), groups that fold and stay as left; each
   game remembers its settings (SDVX no wall, Chunithm its last wall and speed); the wall keys do nothing in a game
   without a wall. Gate: `TestSettingsPanel`, `TestSettingsFold`, `TestEachGameRemembersItsSettings`,
-  `TestWallInAGamesPreset`, `TestGameMemoryStartsFromAnInstallBefore`; the menu checked in the game on Alpha's PC.
+  `TestWallInAGamesPreset`, `TestGameMemoryStartsFromAnInstallBefore`, `TestNoWallKeysInAGameWithout`.
+- [ ] The settings-by-game menu checked in the game on Alpha's PC, every preset (Alpha's ask, 2026-11-08: "update the
+  game and extensively check through the menu"); needs computer use on Alpha's PC. orthomania.exe's own ruleset copy
+  (Reckswell/orthomania) synced and released by the patcher thread.
 - [x] Optional "Key beam" length: Long (today) / Half / Quarter of the track's height on screen, default Long
   (`game-djmax.md` R2). Half and Quarter measured to the wall's edge when there is one (DECISIONS 2026-11-04).
 - [x] Speed in other games' numbers (Alpha's ask, 2026-11-07): "Speed scale" with Chunithm, SDVX, IIDX green number,

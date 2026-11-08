@@ -6,6 +6,19 @@ reads this file at the start of every iteration, applies answers, and moves them
 
 ## Open
 
+### Q25. What each game remembers, and "an option to change the notes"
+Alpha asked that settings depend on the game ("sdvx should have wall = 0, chunithm should have a saved wall preset
+depending on what the previous option was"). Built as: each game remembers everything under Game preset, including its
+scroll speed and any look change (lane tilt, widths, note thickness...); editing the look keeps the game instead of
+switching to Custom, and each setting's reset goes back to the game's value (DECISIONS 2026-11-08 "Settings by game").
+Switching games therefore also switches to that game's last speed. "An option to change the notes" was read as the
+existing Notes choice (Skin ported / Skin warped / Highway), now the first setting.
+- **Options**: (a) as built; (b) remember only the wall and speed per game, look changes make it Custom (as before);
+  (c) remember the wall per game, one speed for all games. For the notes: (x) the Notes choice as built; (y) new note
+  designs per game (Chunithm, SDVX, Sekai shapes) for the default skin.
+- **Default until answered**: (a) and (x).
+- **Answer**:
+
 ### Q23. Turn on the daily check that pp match osu!'s servers
 `.github/workflows/ortho-live-mania.yml` (README "Live osu!mania check") opens a pull request when osu!'s servers move to
 a new osu!mania release. It cannot run yet: GitHub Actions are off for this fork, and a scheduled workflow runs only
