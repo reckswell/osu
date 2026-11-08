@@ -109,7 +109,8 @@ namespace osu.Game.Rulesets.ManiaOrtho.UI
                 return false;
 
             var settings = config.Current;
-            wall.Value = WallScales.Step(settings.WallScale, wall.Value, steps, settings.ToLayout().FarWidthRatio);
+            var layout = settings.ToLayout();
+            wall.Value = WallScales.Step(settings.WallScale, wall.Value, steps, layout.FarWidthRatio, layout.Approach);
 
             // Seen, never handled: the key goes on to everything it would reach in mania.
             return false;

@@ -80,6 +80,18 @@ namespace osu.Game.Rulesets.ManiaOrtho
         private bool syncingSpeed;
 
         private SettingsItemV2 laneWidthSlider = null!;
+
+        private Bindable<HighwayCameraMode> cameraMode = null!;
+
+        /// <summary>
+        /// The lane's tilt, shown with where the lane ends on screen, which also depends on its length and the judgement line.
+        /// </summary>
+        private FormSliderBar<float> laneTiltBar = null!;
+
+        private SettingsItemV2 laneTiltItem = null!;
+        private SettingsItemV2 laneLengthItem = null!;
+        private SettingsItemV2 approachItem = null!;
+        private SettingsItemV2 kiaiLiftItem = null!;
         private Bindable<HighwayWidthMode> widthMode = null!;
 
         /// <summary>
@@ -339,6 +351,20 @@ namespace osu.Game.Rulesets.ManiaOrtho
                 {
                     Keywords = new[] { "camera motion", "sway", "kiai", "shake", "movement" },
                 },
+                kiaiLiftItem = new SettingsItemV2(new FormSliderBar<float>
+                {
+                    Caption = "Kiai lift",
+                    HintText = "Off by default. In kiai sections the lane lifts towards the top of the screen over three beats, as SDVX's "
+                               + "charts tilt it up at a chorus, and settles back after. 100% lifts its far end to the top edge. The judgement "
+                               + "line stays still and, with the Perspective note approach, notes reach it at the same speed. For a lane that "
+                               + "ends below the top (SDVX), under the perspective camera. Purely cosmetic.",
+                    Current = highway.GetBindable<float>(HighwaySetting.KiaiLift),
+                    DisplayAsPercentage = true,
+                    KeyboardStep = 0.05f,
+                })
+                {
+                    Keywords = new[] { "camera motion", "tilt", "kiai", "chorus", "sdvx", "zoom", "pitch", "movement" },
+                },
                 new SettingsGroupHeader("Skin layout"),
                 new SettingsItemV2(new FormEnumDropdown<SkinKeyArea>
                 {
@@ -457,19 +483,53 @@ namespace osu.Game.Rulesets.ManiaOrtho
                 new SettingsItemV2(new FormEnumDropdown<HighwayCameraMode>
                 {
                     Caption = "Camera",
-                    Current = highway.GetBindable<HighwayCameraMode>(HighwaySetting.CameraMode),
+                    HintText = "Perspective: lanes narrow into the distance, as in Chunithm, SDVX and Project Sekai. Parallel tilt: "
+                               + "lanes stay parallel and notes keep a steady speed. Flat: osu!mania's own stage.",
+                    Current = cameraMode = highway.GetBindable<HighwayCameraMode>(HighwaySetting.CameraMode),
                 })
                 {
                     Keywords = new[] { "perspective", "tilt", "flat" },
                 },
-                new SettingsItemV2(new FormSliderBar<float>
+                laneTiltItem = new SettingsItemV2(laneTiltBar = new FormSliderBar<float>
                 {
-                    Caption = "Far edge width",
-                    HintText = "Width of the far end of the track compared to the judgement line. Lower is a stronger perspective.",
-                    Current = highway.GetBindable<float>(HighwaySetting.FarWidthRatio),
-                    DisplayAsPercentage = true,
-                    KeyboardStep = 0.01f,
-                }),
+                    Caption = "Lane tilt",
+                    HintText = "How far the lane leans back, pivoting on the judgement line: more tilt ends it lower on the screen, so "
+                               + "notes come from further down. 0° stands it upright. Chunithm 56.3° (ends 16% down, under its score "
+                               + "frame), Project Sekai 57.8° on a longer lane (to the top), SDVX 81.4° (towards the middle). One camera "
+                               + "for every game preset, so an angle looks the same in each.",
+                    Current = highway.GetBindable<float>(HighwaySetting.LaneTilt),
+                    KeyboardStep = 0.5f,
+                    LabelFormat = laneTiltLabel,
+                })
+                {
+                    Keywords = new[] { "angle", "lane end", "far edge", "approach angle", "pitch", "chunithm", "sdvx", "sekai" },
+                },
+                laneLengthItem = new SettingsItemV2(new FormSliderBar<float>
+                {
+                    Caption = "Lane length",
+                    HintText = "How long the lane is, in screen heights: longer narrows its far end, so notes start smaller and speed up "
+                               + "more near the line. Chunithm 3.3, SDVX 11.46, Project Sekai 13. A lane longer than the screen allows "
+                               + "is cut at the top edge. Perspective camera only.",
+                    Current = highway.GetBindable<float>(HighwaySetting.LaneLength),
+                    KeyboardStep = 0.1f,
+                })
+                {
+                    Keywords = new[] { "far edge width", "depth", "perspective", "narrow", "length" },
+                },
+                approachItem = new SettingsItemV2(new FormSliderBar<float>
+                {
+                    Caption = "Note approach",
+                    HintText = "How notes move down the lane. Perspective (-1): true depth, notes crawl in the distance and rush in "
+                               + "near the line, as in Chunithm and SDVX. Project Sekai (0): they grow by the same factor every moment, so "
+                               + "they move slower near the line. Even (1): a steady speed on screen. Notes still appear and reach the "
+                               + "line at the same times. Perspective camera only.",
+                    Current = highway.GetBindable<float>(HighwaySetting.Approach),
+                    KeyboardStep = 0.05f,
+                    LabelFormat = approachLabel,
+                })
+                {
+                    Keywords = new[] { "approach curve", "easing", "note speed", "sekai", "perspective", "acceleration" },
+                },
                 new SettingsItemV2(new FormSliderBar<float>
                 {
                     Caption = "Judgement line height",
@@ -481,14 +541,6 @@ namespace osu.Game.Rulesets.ManiaOrtho
                 {
                     Keywords = new[] { "lift", "hit position" },
                 },
-                new SettingsItemV2(new FormSliderBar<float>
-                {
-                    Caption = "Far edge height",
-                    HintText = "Distance of the far end of the track below the top of the screen.",
-                    Current = highway.GetBindable<float>(HighwaySetting.FarEdgeHeight),
-                    DisplayAsPercentage = true,
-                    KeyboardStep = 0.01f,
-                }),
                 new SettingsGroupHeader("Lane and note size"),
                 new SettingsItemV2(new FormEnumDropdown<HighwayWidthMode>
                 {
@@ -584,6 +636,21 @@ namespace osu.Game.Rulesets.ManiaOrtho
             foreach (var (scale, units) in speedUnits)
                 units.BindValueChanged(e => setSpeed(scale, e.NewValue));
 
+            cameraMode.BindValueChanged(e =>
+            {
+                bool perspective = e.NewValue == HighwayCameraMode.Perspective;
+
+                show(laneTiltItem, e.NewValue != HighwayCameraMode.Flat);
+                show(laneLengthItem, perspective);
+                show(approachItem, perspective);
+                show(kiaiLiftItem, perspective);
+            }, true);
+
+            // Where the lane ends depends on its length, the judgement line and the camera too.
+            showLaneEndOnChange(highway.GetBindable<float>(HighwaySetting.LaneLength));
+            showLaneEndOnChange(highway.GetBindable<float>(HighwaySetting.JudgementLineHeight));
+            showLaneEndOnChange(cameraMode);
+
             widthMode.BindValueChanged(e =>
             {
                 laneWidthSlider.CanBeShown.Value = e.NewValue == HighwayWidthMode.Lane;
@@ -601,7 +668,10 @@ namespace osu.Game.Rulesets.ManiaOrtho
 
             // The other scales follow the wall, and set it when moved. The screen-based ones depend on the camera.
             wall.BindValueChanged(_ => showWallInOtherScales(null));
-            showWallInOtherScalesOnChange(highway.GetBindable<float>(HighwaySetting.FarWidthRatio));
+            showWallInOtherScalesOnChange(highway.GetBindable<float>(HighwaySetting.LaneTilt));
+            showWallInOtherScalesOnChange(highway.GetBindable<float>(HighwaySetting.LaneLength));
+            showWallInOtherScalesOnChange(highway.GetBindable<float>(HighwaySetting.Approach));
+            showWallInOtherScalesOnChange(highway.GetBindable<float>(HighwaySetting.JudgementLineHeight));
             showWallInOtherScalesOnChange(highway.GetBindable<HighwayCameraMode>(HighwaySetting.CameraMode));
             percentWall.BindValueChanged(e => setWall(WallScale.Percent, (int)Math.Round(e.NewValue * 100)));
             chunithmWall.BindValueChanged(e => setWall(WallScale.Chunithm, e.NewValue));
@@ -639,12 +709,44 @@ namespace osu.Game.Rulesets.ManiaOrtho
 
             foreach (var (scale, slider) in wallSliders)
                 show(slider, hasWall && scale == wallScale.Value);
+        }
 
-            static void show(SettingsItemV2 item, bool visible)
-            {
-                item.CanBeShown.Value = visible;
-                item.Alpha = visible ? 1 : 0;
-            }
+        private static void show(SettingsItemV2 item, bool visible)
+        {
+            item.CanBeShown.Value = visible;
+            item.Alpha = visible ? 1 : 0;
+        }
+
+        private void showLaneEndOnChange<T>(IBindable<T> input)
+        {
+            visibleTimeInputs.Add(input);
+            input.BindValueChanged(_ => Scheduler.AddOnce(formatLaneTilt));
+        }
+
+        // Setting the label's format shows the value again.
+        private void formatLaneTilt() => laneTiltBar.LabelFormat = laneTiltLabel;
+
+        /// <summary>
+        /// The tilt and where it ends the lane, as a share of the screen's height down from the top.
+        /// </summary>
+        private LocalisableString laneTiltLabel(float tilt)
+        {
+            float farY = (highway.Current with { LaneTilt = tilt }).ToLayout().FarY;
+            string angle = tilt.ToString("0.0", CultureInfo.InvariantCulture);
+
+            return farY < 0.005f ? $"{angle}° (to the top)" : $"{angle}° (ends {(farY * 100).ToString("0", CultureInfo.InvariantCulture)}% down)";
+        }
+
+        private static LocalisableString approachLabel(float approach)
+        {
+            if (Math.Abs(approach - ApproachCurve.PERSPECTIVE) < 0.001f)
+                return "Perspective";
+            if (Math.Abs(approach - ApproachCurve.SEKAI) < 0.001f)
+                return "Project Sekai";
+            if (Math.Abs(approach - ApproachCurve.EVEN) < 0.001f)
+                return "Even";
+
+            return approach.ToString("0.00", CultureInfo.InvariantCulture);
         }
 
         private void showWallInOtherScalesOnChange<T>(IBindable<T> input)
@@ -666,19 +768,21 @@ namespace osu.Game.Rulesets.ManiaOrtho
 
             try
             {
-                float ratio = highway.Current.ToLayout().FarWidthRatio;
+                var layout = highway.Current.ToLayout();
+                float ratio = layout.FarWidthRatio;
+                float approach = layout.Approach;
 
-                iidxWall.MaxValue = WallScales.MaxUnits(WallScale.Iidx, ratio);
-                laneWall.MaxValue = WallScales.MaxUnits(WallScale.Lane, ratio) / 100f;
+                iidxWall.MaxValue = WallScales.MaxUnits(WallScale.Iidx, ratio, approach);
+                laneWall.MaxValue = WallScales.MaxUnits(WallScale.Lane, ratio, approach) / 100f;
 
                 if (except != WallScale.Percent)
-                    percentWall.Value = WallScales.ToUnits(WallScale.Percent, wall.Value, ratio) / 100f;
+                    percentWall.Value = WallScales.ToUnits(WallScale.Percent, wall.Value, ratio, approach) / 100f;
                 if (except != WallScale.Chunithm)
-                    chunithmWall.Value = WallScales.ToUnits(WallScale.Chunithm, wall.Value, ratio);
+                    chunithmWall.Value = WallScales.ToUnits(WallScale.Chunithm, wall.Value, ratio, approach);
                 if (except != WallScale.Iidx)
-                    iidxWall.Value = WallScales.ToUnits(WallScale.Iidx, wall.Value, ratio);
+                    iidxWall.Value = WallScales.ToUnits(WallScale.Iidx, wall.Value, ratio, approach);
                 if (except != WallScale.Lane)
-                    laneWall.Value = WallScales.ToUnits(WallScale.Lane, wall.Value, ratio) / 100f;
+                    laneWall.Value = WallScales.ToUnits(WallScale.Lane, wall.Value, ratio, approach) / 100f;
             }
             finally
             {
@@ -698,7 +802,8 @@ namespace osu.Game.Rulesets.ManiaOrtho
 
             try
             {
-                wall.Value = WallScales.FromUnits(scale, units, highway.Current.ToLayout().FarWidthRatio);
+                var layout = highway.Current.ToLayout();
+                wall.Value = WallScales.FromUnits(scale, units, layout.FarWidthRatio, layout.Approach);
             }
             finally
             {

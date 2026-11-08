@@ -148,7 +148,8 @@ From the 2026-11-04 notes (`research/game-osu-mania.md` P1-P7, `topic-covers.md`
 - [x] Playtest at 840 ms visible time too, where Chunithm and Sekai players' near-line speed is (`game-sekai.md` K3).
   Gate: the harness's default capture set includes it. (`playtest.sh` and `playtest.ps1` with no chart or speed: both
   charts at speed 29, 405 ms, and synthetic-7k at 14, 839 ms by the summary; an unset speed is now 29.)
-- [ ] **[Alpha: Q17]** A Sekai preset with Sekai's eased approach (`game-sekai.md` K2).
+- [x] **[Alpha: Q17]** A Sekai preset with Sekai's eased approach (`game-sekai.md` K2). ("Note approach" on every
+  perspective camera, Project Sekai's curve in its preset; DECISIONS 2026-11-08, lane tilt.)
 - [ ] **[Alpha: Q14]** Missed notes slide past the line; the wall keys' gate with "keep speed"; lane tint; a wall for
   Voltex at 9K and up.
 
@@ -212,6 +213,12 @@ Only after Alpha confirms. See the design doc's "Local-only vs self-hosted serve
 - [x] Lane width for the default skin (Alpha's ask, 2026-11-07, decision card): "Width by" Track (default) / Lane, with a
   lane width; ported and warped skin stages keep their widths.
 - [x] Share osu!mania's keys as a switch (Alpha's ask, 2026-11-07).
+- [x] Lane tilt (Alpha's ask, 2026-11-08): "Lane tilt" and "Lane length" replace the far edge sliders, one 60° camera for
+  every preset (Chunithm 56.3° under its HUD, Project Sekai 57.8°, SDVX EG's 81.4°); "Note approach" from true perspective through
+  Project Sekai's curve to an even speed; optional "Kiai lift" (SDVX's chorus pitch, off by default)
+  (`research/topic-approach-angles.md`, `research/topic-camera-motion.md`; DECISIONS 2026-11-08). Gate: `HighwayCameraTest`,
+  `ApproachCurveTest`, `KiaiLiftTest`, `TestLaneTiltByGame`, `TestCustomCameraKeptAsTilt`, `TestLaneTiltSettings`,
+  captures of each tilted preset, the tilt sweep and the lift.
 - [ ] The beam's release as Quaver's (off in 60-100 ms, `game-quaver.md` QV9), only if Alpha's L4 notes say today's
   150 ms ease-out lingers: single captures cannot show it.
 - [x] Low priority: for `SpecialStyle` (N+1 key) maps, a 1 | N−1 divider marking the special column (`game-djmax.md`

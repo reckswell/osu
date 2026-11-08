@@ -34,24 +34,30 @@ how a point at (lane position, distance) is placed on screen.
 
 Requirements:
 
-- Notes enter at the **top edge of the screen** (or at the wall, section 4), never from a point in the middle of the
-  screen. In perspective mode the vanishing point therefore sits at or above the top of the screen, so the far end of
-  the track is a visible edge with real width, not a point.
+- Notes enter at the **far end of the lane** (or at the wall, section 4), a visible edge with real width, never a
+  point: the top edge of the screen or below it, as each game draws it (Alpha, 2026-11-08: Chunithm's notes appear
+  under its HUD band, 16% down; SDVX's towards the middle, 41% down).
 - The judgement line sits near the bottom: default 12% of screen height above the bottom edge *(tune)*.
-- Parameters: tilt angle (0-75 deg, default 55 *(tune)*), field of view (30-90 deg, default 60 *(tune)*), far-edge
-  width as a fraction of near-edge width (perspective only, derived from tilt/FOV, typically 0.3-0.6), track width at
-  the judgement line (fraction of screen width; default from key count, section 5).
+- Parameters (Alpha, 2026-11-08: "a slider that allows the user to adjust the angle at which the lane actually ends
+  relative to the top of the screen"): **lane tilt** (0-85°, how far the lane leans back, pivoting on the judgement
+  line, so more tilt ends it lower on the screen), **lane length** (0.25-16 screen heights; longer narrows the far end;
+  perspective only; a lane longer than the screen allows is cut at the top edge), judgement line height and track width
+  at the line (fraction of screen width; or a lane width, section 5). One camera with a fixed 60° field of view for
+  every preset, so a tilt looks the same in each (`research/topic-approach-angles.md`): Chunithm 56.3° (ends 16% down),
+  Project Sekai 57.8° on a longer lane (to the top), SDVX 81.4° (ends 41% down). The parallel camera has no depth, so only its tilt counts.
 - **Game presets** (Alpha, 2026-11-08: "sort all of the presets by games"): each plays like one game's screen, with its
   camera, judgement line, lane or stage width and note thickness, and shows the speed and the wall in that game's
-  numbers and steps (§3, §4). Tilted: **Chunithm** (notes from the top edge), **SDVX** (notes from towards the middle,
+  numbers and steps (§3, §4). Tilted: **Chunithm** (notes from under its HUD band), **SDVX** (notes from towards the middle,
   narrow far end), **Project Sekai** (high line, very narrow far end). Straight-on: **beatmania IIDX**, **DJMAX**,
   **Quaver**, **StepMania**. **osu!mania** is mania's own stage (flat); **Parallel tilt** a neutral parallel camera.
   Games without a wall or lane cover (SDVX, Project Sekai, DJMAX, osu!mania) have none: the wall is down and its
   settings hidden. Changing the look by hand makes the preset Custom; the speed, the wall in a game with one, and the
   numbers they are shown in stay as the player sets them. Values come from the research notes and are recorded in
   `DECISIONS.md`.
-- No camera motion driven by beatmap data. Optional cosmetic motion (for example a small sway in kiai) is allowed later,
-  off by default, and must never move the judgement line.
+- No camera motion driven by beatmap data. Optional cosmetic motion is allowed, off by default, and must never move the
+  judgement line: **kiai sway** (the far end swings with the beat) and **kiai lift** (the lane pitches up towards the top
+  of the screen over three beats, as SDVX's charts do at a chorus, with the notes' speed at the line kept;
+  `research/topic-camera-motion.md`).
 
 ## 3. Scroll speed
 
@@ -61,6 +67,11 @@ Requirements:
 - Notes move linearly in **track space** (d is linear in time at constant SV). Under perspective they therefore move
   slowly far away and accelerate near the line. That is correct and expected (it is what SDVX does); do not "correct"
   it in screen space.
+- **Note approach** (Alpha, 2026-11-08, Q17 (b)): a choice on every perspective camera of how track depth is drawn
+  along the lane, from **Perspective** (the default; linear in depth, as above) through **Project Sekai** (notes grow by
+  the same factor every moment, Sekai's own curve) to **Even** (a steady speed on screen). The track's shape does not
+  change, notes still appear and reach the line at the same times, and everything placed by depth follows the same
+  curve (`ApproachCurve`).
 - Scroll velocity (SV) changes behave exactly as in mania (the same algorithm: sequential, or constant with the
   Constant Speed mod; mania has no overlapping mode).
 - **Speed scale** (Alpha, 2026-11-07): the speed can be set in another game's numbers instead of osu!mania's: Chunithm,

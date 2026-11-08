@@ -86,6 +86,11 @@ SPEC 2 and Alpha's brief say notes come from the top of the screen.
 - **Answer** (Alpha, 2026-11-08, presets by game): (a) for Chunithm ("a consistent projection of notes from the top of
   the screen to the bottom"); SDVX's notes come "from the center of the screen", so Voltex has USC's faithful far edge,
   0.284. The lane tilt thread's camera (tilt, lane length, field of view) refines both.
+- **Answer** (Alpha, 2026-11-08, after the lane tilt renders): (b) for Chunithm after all: "chunithm's notes don't
+  actually come from the very top of the screen (still a bit of section where they display things like score, passing,
+  justice count, life, etc.) so measure this first". Measured again on Alpha's frame (the score frame ends 16.2-16.5%
+  down, as the research's 16.3%): the preset is the arcade's lane, 56.3° and 3.30 long. No frame is drawn over the band;
+  osu!'s own HUD and the background show there.
 
 ### Q8. Wall behaviour in the Chunithm preset
 In the arcade the field wall is off by default, goes up to about 90% of the track, and keeps note speed (visible time
@@ -150,8 +155,8 @@ speed difference). `research/game-sekai.md` K2 has the values and the curve (it 
 - **Answer** (Alpha, 2026-11-08): a Project Sekai preset, with its own speed numbers and no wall; the approach curves
   ("different angular projections so the user can customize the way notes approach") come from the lane tilt thread,
   as a choice on every preset, so (b). Until then the Sekai preset is linear with a wider far edge (DECISIONS
-  2026-11-08, "Presets by game").
-- **Answer**:
+  2026-11-08, "Presets by game"). Built: "Note approach" on every perspective camera, Sekai's curve and true geometry in
+  its preset (DECISIONS 2026-11-08, lane tilt).
 
 ### Q18. Replays of your maniaortho plays
 osu! stores replays only for its four own rulesets, so it keeps none of your maniaortho plays: nothing to watch from

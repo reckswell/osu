@@ -281,12 +281,21 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Configuration
             AddAssert("the sliders follow", () => (wallSlider<float>("Wall").Current.Value, wallSlider<int>("Wall (Chunithm)").Current.Value),
                 () => Is.EqualTo((0.4f, WallScales.ChunithmStep(0.4f))));
 
-            AddStep("a far narrower camera", () => gameConfig.Highway.SetValue(HighwaySetting.FarWidthRatio, 0.1f));
+            AddStep("a far narrower camera", () =>
+            {
+                gameConfig.Highway.SetValue(HighwaySetting.LaneTilt, 80f);
+                gameConfig.Highway.SetValue(HighwaySetting.LaneLength, 12f);
+            });
+            AddAssert("its far end is narrower", () => gameConfig.Highway.Current.ToLayout().FarWidthRatio, () => Is.LessThan(0.1f));
             AddAssert("the white number follows the camera", () => wallSlider<int>("Wall (white number)").Current.Value,
-                () => Is.EqualTo(WallScales.ToUnits(WallScale.Iidx, 0.4f, 0.1f)));
+                () => Is.EqualTo(WallScales.ToUnits(WallScale.Iidx, 0.4f, gameConfig.Highway.Current.ToLayout().FarWidthRatio)));
             AddAssert("the wall stays", () => gameConfig.Highway.Get<float>(HighwaySetting.Wall), () => Is.EqualTo(0.4f).Within(1e-4f));
             AddAssert("its most follows the camera too", () => ((BindableNumber<int>)wallSlider<int>("Wall (white number)").Current).MaxValue,
-                () => Is.EqualTo(WallScales.MaxUnits(WallScale.Iidx, 0.1f)));
+                () => Is.EqualTo(WallScales.MaxUnits(WallScale.Iidx, gameConfig.Highway.Current.ToLayout().FarWidthRatio)));
+
+            AddStep("Project Sekai's approach", () => gameConfig.Highway.SetValue(HighwaySetting.Approach, ApproachCurve.SEKAI));
+            AddAssert("the white number follows the approach", () => wallSlider<int>("Wall (white number)").Current.Value,
+                () => Is.EqualTo(WallScales.ToUnits(WallScale.Iidx, 0.4f, gameConfig.Highway.Current.ToLayout().FarWidthRatio, ApproachCurve.SEKAI)));
         }
 
         /// <summary>
@@ -312,7 +321,7 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Configuration
             {
                 using (var config = create())
                 {
-                    config.Highway.SetValue(HighwaySetting.FarWidthRatio, 0.33f);
+                    config.Highway.SetValue(HighwaySetting.LaneTilt, 66.6f);
                     config.Highway.SetValue(HighwaySetting.Wall, 0.25f);
                     config.Highway.SetValue(HighwaySetting.NoteThickness, 0.04f);
                     config.Highway.SetValue(HighwaySetting.WallKeepsVisibleTime, false);
@@ -325,7 +334,7 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Configuration
                 using (var config = create())
                 {
                     var current = config.Highway.Current;
-                    return near(current.FarWidthRatio, 0.33f)
+                    return near(current.LaneTilt, 66.6f)
                            && near(current.Wall, 0.25f)
                            && near(current.NoteThickness, 0.04f)
                            && !current.WallKeepsVisibleTime
@@ -906,6 +915,181 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Configuration
             AddUntilStep("Custom, with the wall's settings", () => gameConfig.Highway.Get<HighwayPreset>(HighwaySetting.Preset) == HighwayPreset.Custom && wallHeader.IsPresent);
         }
 
+        /// <summary>
+        /// Lane tilt (Alpha 2026-11-08): each tilted game's own lane, one camera for all, so the same tilt means the same in
+        /// every preset (research/topic-approach-angles.md).
+        /// </summary>
+        [Test]
+        public void TestLaneTiltByGame()
+        {
+            AddAssert("Chunithm ends under its HUD, 0.24 wide", () => layoutOf(HighwayPreset.Chunithm), () => Is.EqualTo((0.163f, 0.24f)).Using<(float, float)>(nearLayout));
+            AddAssert("SDVX ends 41% down, 0.071 wide", () => layoutOf(HighwayPreset.Voltex), () => Is.EqualTo((0.41f, 0.071f)).Using<(float, float)>(nearLayout));
+            AddAssert("Project Sekai ends just under the top, 0.073 wide", () => layoutOf(HighwayPreset.Sekai), () => Is.EqualTo((0.016f, 0.073f)).Using<(float, float)>(nearLayout));
+            AddAssert("only Project Sekai eases its notes", () => Enum.GetValues<HighwayPreset>().Where(p => p != HighwayPreset.Custom)
+                                                                      .Where(p => HighwayPresets.Get(p).ToLayout().Approach != ApproachCurve.PERSPECTIVE),
+                () => Is.EqualTo(new[] { HighwayPreset.Sekai }));
+            AddAssert("the straight-on games stand upright to the top", () => new[] { HighwayPreset.Iidx, HighwayPreset.Djmax, HighwayPreset.Quaver, HighwayPreset.StepMania }
+                                                                                .Select(p => HighwayPresets.Get(p).ToLayout().FarY),
+                () => Is.All.EqualTo(0));
+
+            AddAssert("tilting makes it Custom", () =>
+            {
+                using (var config = create())
+                {
+                    config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Voltex);
+                    config.Highway.SetValue(HighwaySetting.LaneTilt, 70f);
+                    return config.Highway.Get<HighwayPreset>(HighwaySetting.Preset);
+                }
+            }, () => Is.EqualTo(HighwayPreset.Custom));
+
+            AddAssert("so does the approach", () =>
+            {
+                using (var config = create())
+                {
+                    config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Sekai);
+                    config.Highway.SetValue(HighwaySetting.Approach, ApproachCurve.PERSPECTIVE);
+                    return config.Highway.Get<HighwayPreset>(HighwaySetting.Preset);
+                }
+            }, () => Is.EqualTo(HighwayPreset.Custom));
+
+            AddAssert("a straight-on game ignores the hidden length and approach", () =>
+            {
+                using (var config = create())
+                {
+                    config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Iidx);
+                    config.Highway.SetValue(HighwaySetting.LaneLength, 9f);
+                    config.Highway.SetValue(HighwaySetting.Approach, ApproachCurve.EVEN);
+                    return config.Highway.Get<HighwayPreset>(HighwaySetting.Preset);
+                }
+            }, () => Is.EqualTo(HighwayPreset.Iidx));
+
+            static (float, float) layoutOf(HighwayPreset preset)
+            {
+                var layout = HighwayPresets.Get(preset).ToLayout();
+                return (layout.FarY, layout.FarWidthRatio);
+            }
+
+            static bool nearLayout((float, float) a, (float, float) b) => System.Math.Abs(a.Item1 - b.Item1) < 0.002f && System.Math.Abs(a.Item2 - b.Item2) < 0.002f;
+        }
+
+        /// <summary>
+        /// An install from before the lane tilt keeps its Custom camera's shape, once; a named preset shows its own lane.
+        /// </summary>
+        [TestCase(HighwayCameraMode.Perspective, 0.106f, 0.284f)]
+        [TestCase(HighwayCameraMode.Perspective, 0.5f, 0f)]
+        [TestCase(HighwayCameraMode.Perspective, 1f, 0.3f)]
+        [TestCase(HighwayCameraMode.ParallelTilt, 1f, 0.3f)]
+        public void TestCustomCameraKeptAsTilt(HighwayCameraMode mode, float farWidthRatio, float farEdgeHeight)
+        {
+            AddStep("store a camera from before", () =>
+            {
+                using (var config = create())
+                {
+                    config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Custom);
+                    config.Highway.SetValue(HighwaySetting.CameraMode, mode);
+                    config.Highway.SetValue(HighwaySetting.JudgementLineHeight, 0.059f);
+                    config.Highway.SetValue(HighwaySetting.FarWidthRatio, farWidthRatio);
+                    config.Highway.SetValue(HighwaySetting.FarEdgeHeight, farEdgeHeight);
+                    config.Highway.SetValue(HighwaySetting.LaneTiltApplied, false);
+                }
+            });
+
+            AddAssert("it draws the same lane", () =>
+            {
+                using (var config = create())
+                {
+                    var layout = config.Highway.Current.ToLayout();
+                    return (layout.FarY, layout.FarWidthRatio);
+                }
+            }, () => Is.EqualTo((farEdgeHeight, farWidthRatio)).Using<(float, float)>((a, b) => System.Math.Abs(a.Item1 - b.Item1) < 0.003f
+                                                                                                    && System.Math.Abs(a.Item2 - b.Item2) < 0.003f));
+
+            AddStep("tilt it", () =>
+            {
+                using (var config = create())
+                    config.Highway.SetValue(HighwaySetting.LaneTilt, 30f);
+            });
+
+            AddAssert("only once", () =>
+            {
+                using (var config = create())
+                    return config.Highway.Get<float>(HighwaySetting.LaneTilt);
+            }, () => Is.EqualTo(30f));
+        }
+
+        /// <summary>
+        /// The camera settings: tilt shows where it ends the lane; length and approach only for the perspective camera; the
+        /// far edge sliders they replaced are gone.
+        /// </summary>
+        [Test]
+        public void TestLaneTiltSettings()
+        {
+            AddStep("Chunithm", () =>
+            {
+                gameConfig.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Custom);
+                gameConfig.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Chunithm);
+            });
+            showPanel();
+
+            AddAssert("no far edge sliders", () => this.ChildrenOfType<FormSliderBar<float>>().Select(b => b.Caption.ToString()),
+                () => Has.None.StartsWith("Far edge"));
+            AddAssert("tilt ends the lane under the HUD", () => tiltLabel(), () => Is.EqualTo("56.3° (ends 16% down)"));
+            AddStep("a lane to the top", () => gameConfig.Highway.SetValue(HighwaySetting.LaneTilt, 45f));
+            AddUntilStep("the label says so", () => tiltLabel(), () => Is.EqualTo("45.0° (to the top)"));
+            AddAssert("length and approach shown", () => shown(cameraSlider("Lane length")) && shown(cameraSlider("Note approach")));
+
+            AddStep("SDVX", () => gameConfig.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Voltex));
+            AddUntilStep("tilt ends the lane 41% down", () => tiltLabel(), () => Is.EqualTo("81.4° (ends 41% down)"));
+            AddStep("a shorter lane", () => gameConfig.Highway.SetValue(HighwaySetting.LaneLength, 4f));
+            AddUntilStep("the label follows the length", () => tiltLabel(), () => Is.Not.EqualTo("81.4° (ends 41% down)"));
+            AddAssert("approach reads as perspective", () => cameraSlider("Note approach").LabelFormat(ApproachCurve.PERSPECTIVE).ToString(), () => Is.EqualTo("Perspective"));
+            AddAssert("and Sekai's as Sekai's", () => cameraSlider("Note approach").LabelFormat(ApproachCurve.SEKAI).ToString(), () => Is.EqualTo("Project Sekai"));
+
+            AddStep("IIDX", () => gameConfig.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Iidx));
+            AddUntilStep("tilt only", () => shown(cameraSlider("Lane tilt")) && !shown(cameraSlider("Lane length")) && !shown(cameraSlider("Note approach"))
+                                            && !shown(cameraSlider("Kiai lift")));
+
+            AddStep("osu!mania", () => gameConfig.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Classic));
+            AddUntilStep("no tilt", () => !shown(cameraSlider("Lane tilt")));
+
+            string tiltLabel()
+            {
+                var bar = cameraSlider("Lane tilt");
+                return bar.LabelFormat(bar.Current.Value).ToString();
+            }
+        }
+
+        /// <summary>
+        /// The kiai lift (research/topic-camera-motion.md C1) is off by default, and a preference outside the presets.
+        /// </summary>
+        [Test]
+        public void TestKiaiLiftIsOffByDefault()
+        {
+            AddAssert("off", () =>
+            {
+                using (var config = create())
+                    return new[] { new HighwaySettings().KiaiLift, config.Highway.Current.KiaiLift };
+            }, () => Is.EqualTo(new[] { 0f, 0f }));
+
+            AddAssert("kept, keeps the preset, and a preset leaves it", () =>
+            {
+                using (var config = create())
+                {
+                    config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Voltex);
+                    config.Highway.SetValue(HighwaySetting.KiaiLift, 0.3f);
+                }
+
+                using (var config = create())
+                {
+                    var kept = (config.Highway.Current.KiaiLift, config.Highway.Get<HighwayPreset>(HighwaySetting.Preset));
+                    config.Highway.SetValue(HighwaySetting.Preset, HighwayPreset.Chunithm);
+                    return (kept, config.Highway.Current.KiaiLift);
+                }
+            }, () => Is.EqualTo(((0.3f, HighwayPreset.Voltex), 0.3f)));
+        }
+
+        private FormSliderBar<float> cameraSlider(string caption) => this.ChildrenOfType<FormSliderBar<float>>().Single(b => b.Caption.ToString() == caption);
+
         private SettingsGroupHeader wallHeader => this.ChildrenOfType<SettingsGroupHeader>().Single(h => h.Text.ToString() == "Wall");
 
         /// <summary>
@@ -1152,9 +1336,10 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Configuration
 
         private static bool same(HighwaySettings a, HighwaySettings b)
             => a.CameraMode == b.CameraMode
-               && near(a.FarWidthRatio, b.FarWidthRatio)
+               && near(a.LaneTilt, b.LaneTilt)
+               && near(a.LaneLength, b.LaneLength)
+               && near(a.Approach, b.Approach)
                && near(a.JudgementLineHeight, b.JudgementLineHeight)
-               && near(a.FarEdgeHeight, b.FarEdgeHeight)
                && near(a.TrackWidth, b.TrackWidth)
                && near(a.Wall, b.Wall)
                && near(a.NoteThickness, b.NoteThickness);

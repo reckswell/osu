@@ -1,5 +1,9 @@
 # Sound Voltex: track camera and highway geometry
 
+> **Update (2026-11-08, `topic-approach-angles.md` §7):** a real Konasute EG frame (Alpha's screenshot) puts the
+> critical line at 0.707H as USC portrait does, but the lane is steeper and longer: far edge 0.393H, vanishing point
+> 0.369H, far/near 0.071 (BT area). Chart camera motion is surveyed in `topic-camera-motion.md`.
+
 > **Update (2026-11-07, `topic-speed-scales.md`):** EG's lane speed (1-10) is the older games' BPM × HS over 100;
 > by the clones' constant T = 4800 / lane speed ms (the arcade is unmeasured).
 

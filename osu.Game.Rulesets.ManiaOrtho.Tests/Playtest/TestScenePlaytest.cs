@@ -202,6 +202,7 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Playtest
                     ortho.Highway.GetBindable<float>(HighwaySetting.TrackOpacity).SetDefault();
                     ortho.Highway.GetBindable<KeyBeamLength>(HighwaySetting.KeyBeam).SetDefault();
                     ortho.Highway.GetBindable<float>(HighwaySetting.KiaiSway).SetDefault();
+                    ortho.Highway.GetBindable<float>(HighwaySetting.KiaiLift).SetDefault();
 
                     options.ApplyHighwayValues(ortho.Highway);
 
@@ -440,9 +441,13 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Playtest
                     ? new
                     {
                         camera = used.CameraMode.ToString(),
-                        used.FarWidthRatio,
+                        used.LaneTilt,
+                        used.LaneLength,
+                        used.Approach,
+                        // Where the camera puts the lane's far end, and how wide it is there.
+                        farY = used.ToLayout().FarY,
+                        farWidthRatio = used.ToLayout().FarWidthRatio,
                         used.JudgementLineHeight,
-                        used.FarEdgeHeight,
                         used.TrackWidth,
                         used.Wall,
                         used.WallKeepsVisibleTime,
@@ -460,6 +465,7 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Playtest
                         used.TrackOpacity,
                         keyBeam = used.KeyBeam.ToString(),
                         used.KiaiSway,
+                        used.KiaiLift,
                         wallScale = used.WallScale.ToString(),
                         speedScale = used.SpeedScale.ToString(),
                         widthMode = used.WidthMode.ToString(),
