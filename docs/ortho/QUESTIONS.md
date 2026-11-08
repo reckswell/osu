@@ -150,8 +150,8 @@ speed difference). `research/game-sekai.md` K2 has the values and the curve (it 
 - **Answer** (Alpha, 2026-11-08): a Project Sekai preset, with its own speed numbers and no wall; the approach curves
   ("different angular projections so the user can customize the way notes approach") come from the lane tilt thread,
   as a choice on every preset, so (b). Until then the Sekai preset is linear with a wider far edge (DECISIONS
-  2026-11-08, "Presets by game").
-- **Answer**:
+  2026-11-08, "Presets by game"). Built: "Note approach" on every perspective camera, Sekai's curve and true geometry in
+  its preset (DECISIONS 2026-11-08, lane tilt).
 
 ### Q18. Replays of your maniaortho plays
 osu! stores replays only for its four own rulesets, so it keeps none of your maniaortho plays: nothing to watch from

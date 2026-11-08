@@ -1358,3 +1358,61 @@ alternatives considered, how to reverse. If a later decision overrides one, add 
   preset, Speed, Camera, Lane and note size, Wall). Headings hide while searching unless their own name matches.
 - **Reverse**: `HighwayPresets.HasWall` returning true shows the wall everywhere; the speed scale's dropdown stays, so
   any game's numbers can be used with any preset.
+
+## 2026-11-08: Lane tilt, lane length and note approach replace the far edge sliders (Alpha)
+
+Alpha asked for "a slider that allows the user to adjust the angle at which the lane actually ends relative to the top
+of the screen", with every game's kind of tilt and approach kept consistent across presets
+(`research/topic-approach-angles.md`, `research/topic-camera-motion.md`). This reverses 2026-11-03 ("Camera is set in
+screen terms"), as that entry allowed.
+
+- **Lane tilt and lane length are the camera** (`HighwayCamera`): a pinhole with a fixed 60° vertical field of view
+  (USC's) looking at a lane that pivots on the judgement line. Tilt mostly moves where the lane ends; length mostly sets
+  how narrow its far end is. The two stored far edge settings (width ratio, height) are derived from them, so every
+  caller of `HighwayLayout` is unchanged. A fixed field of view is what makes a degree mean the same in every preset;
+  with the lane's ends pinned, the field of view is redundant anyway (the 2026-11-03 argument).
+- **Why length and not the far edge width as the second slider**: Alpha described SDVX's lane as "proportionally
+  longer", which is the length; at a fixed length, tilting is the rigid pivot SDVX's charts use (`zoom_top`), so the
+  near end's look holds while the far end moves. The far edge width is shown by the track itself.
+- **A lane longer than the screen allows is cut at the top edge**, so notes never enter above it and the visible time
+  stays the speed setting. Chunithm's stretched-to-the-top lane is exactly this: 47.5° with the far end 0.241 wide
+  where the top cuts it (was 0.24). Any lane length above about 3.7 draws the same, so its length is a placeholder.
+- **The parallel camera ignores the length**: it has no depth cue, so only the lane's height counts, `cos(tilt)` of the
+  screen above the line (reaching the top when upright). Its length and approach sliders are hidden, and
+  `matches` ignores them for straight-on presets.
+- **Presets**: Chunithm 47.5° / 3.72 (to the top, Q7); SDVX moves from USC's landscape camera (71.3° / 7.71, far edge
+  28.4% down, 0.106) to SDVX EG's own lane measured on Alpha's frame (81.4° / 11.46: ends 41% down, 0.071 wide), with
+  USC's landscape line and width kept (the arcade is portrait), and notes 1.05% of the track so they stay USC's height
+  at the line (1.25% of the shorter USC lane); Project Sekai gets its true geometry (57.8° / 13, far end 0.073) and its
+  own approach curve, so its stand-in 0.18 far edge and 1.85% notes go: notes are 3.4% of the visible time, Sekai's,
+  and 7.4% of the screen at the line. The straight-on games stand upright (0°).
+- **Note approach** (`ApproachCurve`, `HighwayLayout.Approach`): a slider from -1 (true perspective) through 0
+  (Project Sekai's `1.06^(45(u-1))`, sizes growing by the same factor every moment) to 1 (a steady on-screen speed),
+  the family `s^p = 1 - t(1 - r^p)`. It is applied inside `HighwayProjection` (`ScaleAt`, `YAt`, `DepthAtY`, `ToScreen`),
+  so notes, holds, bar lines, the wall, the beams and the warped stage all follow one curve, and every textured quad is
+  already cut into 8 px strips placed by the projection, so no draw path needed its own easing. The track's shape and
+  its texture are the same; only where along it each depth lies changes. The wall's on-screen units (IIDX white number,
+  % of the lane) take the approach too. Perspective only; the default and every preset but Sekai stay -1.
+- **Kiai lift** (`KiaiLift`, `HighwayLayout.Lifted`): research C1's formula, not a change of tilt. The far edge rises by
+  the strength times its gap to the top, and the far end widens so `(line - far edge) / far width` holds: the notes'
+  speed at the line (under the Perspective approach; Sekai's curve changes it about 1.5%, Even by the lane's change in
+  height) and the near end's look do not change, and a side stage's lean keeps its convergence point. Over
+  three beats (clamped 0.5-1.5 s, smoothstep) from each kiai section's start, held, and three beats back after its end;
+  sections closer than a ramp merge (`KiaiSections`, now shared with the kiai sway). 0-100%, default off, a preference
+  outside presets, perspective only. It does nothing on a lane that already reaches the top (Chunithm) and next to
+  nothing on Sekai's (1.6% below it), so it is SDVX's: at 100% SDVX's notes come from the top during the chorus,
+  Alpha's description.
+- **Upgrades**: a named preset shows its own lane; a Custom camera is turned into the tilt and length that draw it, once
+  (`LaneTiltApplied`): a parallel camera's height as its tilt, a perspective camera with a 100% far end as an upright
+  lane of that height. Old far edge widths above about 0.78 at the steepest tilt need a lane shorter than the 0.25
+  minimum and come back slightly narrower.
+- **Far past the far edge** the eased curves stop at the vanishing point (sizes no smaller than a millionth of the
+  line's), as true perspective does, so rows of mania's stage far above the track stay finite (gameplay-reviewer).
+- **Judgements below the line** stop growing half way to the camera plane measured on the perspective lane, so the cap
+  is the same whatever the approach.
+- **Not optimised**: each eased point costs one or two `Math.Pow`; Sekai's curve (the only preset that eases) costs one.
+  Caching `r^p` per projection would halve the rest; not needed at the vertex counts the track draws.
+- **Not built**: SDVX's laser roll and spins (they move the judgement line; topic-camera-motion.md excludes them), a kiai
+  flash, and per-preset field of view.
+- **Reverse**: put `FarWidthRatio`/`FarEdgeHeight` back in `HighwaySettings` (the stored keys are still there) and
+  derive tilt for display only; approach -1 everywhere restores linear depth.

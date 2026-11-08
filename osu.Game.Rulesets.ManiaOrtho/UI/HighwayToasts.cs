@@ -140,7 +140,8 @@ namespace osu.Game.Rulesets.ManiaOrtho.UI
                 cover = wall > 0 ? $"{WallScales.Format(settings.WallScale, wall, 1)}, not drawn by the flat camera" : "Off";
             else if (wall > 0)
             {
-                cover = WallScales.Describe(settings.WallScale, wall, settings.ToLayout().FarWidthRatio);
+                var layout = settings.ToLayout();
+                cover = WallScales.Describe(settings.WallScale, wall, layout.FarWidthRatio, layout.Approach);
                 if (!settings.WallKeepsVisibleTime)
                     cover += " (speed kept)";
             }

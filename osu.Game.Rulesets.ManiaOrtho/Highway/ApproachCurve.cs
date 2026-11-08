@@ -33,6 +33,13 @@ namespace osu.Game.Rulesets.ManiaOrtho.Highway
         private const double near_zero = 1e-4;
 
         /// <summary>
+        /// The smallest size a note is drawn at, next to its size at the line. Far past the far edge (a row of mania's stage far
+        /// above the visible track) the eased curves would otherwise run off to infinity; they stop at the vanishing point, as
+        /// true perspective does.
+        /// </summary>
+        private const double min_scale = 1e-6;
+
+        /// <summary>
         /// The perspective depth (as <see cref="HighwayProjection"/> places it) of a note at track depth
         /// <paramref name="depth"/> (0 at the line, 1 at the far edge, negative once passed).
         /// </summary>
@@ -58,7 +65,7 @@ namespace osu.Game.Rulesets.ManiaOrtho.Highway
                 scale = Math.Pow(basis, 1 / p);
             }
 
-            return (float)((1 / scale - 1) / c);
+            return (float)((1 / Math.Max(min_scale, scale) - 1) / c);
         }
 
         /// <summary>

@@ -245,9 +245,32 @@ namespace osu.Game.Rulesets.ManiaOrtho.Highway
         public HighwayCameraMode CameraMode { get; init; }
 
         /// <summary>
-        /// Far-edge width over judgement-line width (perspective only).
+        /// How far the lane leans back from the screen, in degrees, pivoting about the judgement line (<see cref="HighwayCamera"/>):
+        /// 0 stands it upright, more lays it back so it ends lower on the screen. The same in every preset: one camera, one field
+        /// of view (research/topic-approach-angles.md). Tilted cameras only.
         /// </summary>
-        public float FarWidthRatio { get; init; }
+        public float LaneTilt { get; init; }
+
+        /// <summary>
+        /// How long the lane is, in screen heights at the judgement line's distance (<see cref="HighwayCamera.LaneLength"/>): a
+        /// longer lane ends higher and narrower. Perspective only; a lane longer than the screen allows is cut at the top edge.
+        /// </summary>
+        public float LaneLength { get; init; }
+
+        /// <summary>
+        /// How notes travel down the lane (<see cref="HighwayLayout.Approach"/>, <see cref="ApproachCurve"/>). Perspective only.
+        /// </summary>
+        public float Approach { get; init; }
+
+        /// <summary>
+        /// Chunithm's lane tilt, reaching the top edge (<see cref="HighwayPresets"/>).
+        /// </summary>
+        public const float DEFAULT_LANE_TILT = 47.5f;
+
+        /// <summary>
+        /// Chunithm's lane length (<see cref="HighwayPresets"/>).
+        /// </summary>
+        public const float DEFAULT_LANE_LENGTH = 3.72f;
 
         /// <summary>
         /// The judgement line's height above the bottom of the playfield (IIDX "LIFT" is a higher value).
@@ -258,11 +281,6 @@ namespace osu.Game.Rulesets.ManiaOrtho.Highway
         /// The highest <see cref="JudgementLineHeight"/> can be set, and the highest a ported skin may lift the line.
         /// </summary>
         public const float MAX_JUDGEMENT_LINE_HEIGHT = 0.4f;
-
-        /// <summary>
-        /// The far edge's distance below the top of the playfield.
-        /// </summary>
-        public float FarEdgeHeight { get; init; }
 
         /// <summary>
         /// The track's width at the judgement line.
@@ -451,12 +469,22 @@ namespace osu.Game.Rulesets.ManiaOrtho.Highway
         /// </summary>
         public float KiaiSway { get; init; }
 
+        /// <summary>
+        /// How far the lane lifts in kiai sections (<see cref="Highway.KiaiLift"/>, <see cref="HighwayLayout.Lifted"/>), from 0
+        /// (off, the default) to 1 (its far end up at the top edge), as SDVX's charts pitch the lane up at a chorus. Cosmetic;
+        /// the judgement line never moves and, with the Perspective approach, notes reach it at the same speed. Perspective only,
+        /// and only where the lane ends
+        /// below the top of the screen.
+        /// </summary>
+        public float KiaiLift { get; init; }
+
         public HighwaySettings()
         {
             CameraMode = HighwayCameraMode.Perspective;
-            FarWidthRatio = 0.5f;
+            LaneTilt = DEFAULT_LANE_TILT;
+            LaneLength = DEFAULT_LANE_LENGTH;
+            Approach = ApproachCurve.PERSPECTIVE;
             JudgementLineHeight = 0.12f;
-            FarEdgeHeight = 0;
             TrackWidth = 0.5f;
             Wall = 0;
             NoteThickness = DEFAULT_NOTE_THICKNESS;
@@ -476,6 +504,7 @@ namespace osu.Game.Rulesets.ManiaOrtho.Highway
             TrackOpacity = 1;
             KeyBeam = KeyBeamLength.Long;
             KiaiSway = 0;
+            KiaiLift = 0;
             WallScale = WallScale.Percent;
             SpeedScale = SpeedScale.Mania;
             WidthMode = HighwayWidthMode.Track;
@@ -485,14 +514,22 @@ namespace osu.Game.Rulesets.ManiaOrtho.Highway
         /// <summary>
         /// Where the track sits on screen. Not meaningful for <see cref="HighwayCameraMode.Flat"/>, which keeps mania's layout.
         /// </summary>
-        public HighwayLayout ToLayout() => new HighwayLayout
+        public HighwayLayout ToLayout()
         {
-            JudgementY = 1 - JudgementLineHeight,
-            FarY = FarEdgeHeight,
-            NearWidth = TrackWidth,
-            FarWidthRatio = CameraMode == HighwayCameraMode.Perspective ? FarWidthRatio : 1,
-            CentreX = 0.5f,
-        };
+            float judgementY = 1 - JudgementLineHeight;
+            bool perspective = CameraMode == HighwayCameraMode.Perspective;
+            var (farY, farWidthRatio) = new HighwayCamera(LaneTilt, LaneLength).Project(judgementY, perspective);
+
+            return new HighwayLayout
+            {
+                JudgementY = judgementY,
+                FarY = farY,
+                NearWidth = TrackWidth,
+                FarWidthRatio = farWidthRatio,
+                CentreX = 0.5f,
+                Approach = perspective ? Approach : ApproachCurve.PERSPECTIVE,
+            };
+        }
 
         /// <summary>
         /// How time maps onto the track, given the wall.
@@ -513,60 +550,63 @@ namespace osu.Game.Rulesets.ManiaOrtho.Highway
             switch (preset)
             {
                 case HighwayPreset.Chunithm:
-                    // Measured from the arcade (research/game-chunithm.md): judgement line 7.4% above the bottom, track
-                    // 0.61 of the screen wide there, far/near width 0.24. The arcade's far edge sits 16% below the top,
-                    // under its HUD frame; here it is stretched to the top edge so notes enter from the top (SPEC 2,
-                    // QUESTIONS Q7). Same width for every key count, as in the arcade.
+                    // Measured from the arcade (research/game-chunithm.md, and Alpha's frame in topic-approach-angles.md 7):
+                    // judgement line 7.4% above the bottom, track 0.61 of the screen wide there, far/near width 0.24. The
+                    // arcade's far edge sits 16% below the top, under its HUD frame (a lane 56.3° back, 3.30 long); here it
+                    // is stretched to the top edge so notes enter from the top (SPEC 2, QUESTIONS Q7): 47.5° back, the far end
+                    // 0.24 wide where the top edge cuts it. Same width for every key count, as in the arcade.
                     return new HighwaySettings
                     {
                         CameraMode = HighwayCameraMode.Perspective,
-                        FarWidthRatio = 0.24f,
+                        LaneTilt = 47.5f,
+                        LaneLength = 3.72f,
+                        Approach = ApproachCurve.PERSPECTIVE,
                         JudgementLineHeight = 0.074f,
-                        FarEdgeHeight = 0,
                         TrackWidth = 0.61f,
                         SpeedScale = SpeedScale.Chunithm,
                         WallScale = WallScale.Chunithm,
                     };
 
                 case HighwayPreset.Voltex:
-                    // The default camera of the open-source SDVX clone USC in a landscape window, projected
-                    // (research/game-sdvx.md P1; no arcade frame could be measured): judgement line 5.9% above the bottom,
-                    // highway 0.435 of the screen wide there, far/near width 0.106, its far edge 28.4% below the top: notes
-                    // come from towards the middle of the screen, not the top (Alpha 2026-11-08, QUESTIONS Q7). Notes 1.25% of
-                    // the track deep, USC's note depth: at 2.55% this camera draws them twice Chunithm's height near the line.
+                    // SDVX EG's own lane, measured on Alpha's frame (research/topic-approach-angles.md 7): 81.4° back and 11.5
+                    // screen heights long, steeper and longer than the open-source clone USC's (71.3°, 7.71). Notes come from
+                    // towards the middle of the screen, not the top (Alpha 2026-11-08, QUESTIONS Q7): the lane ends 41% below the
+                    // top, its far end 0.071 as wide as the line. The arcade's screen is portrait; here the line and width are
+                    // USC's in a landscape window (research/game-sdvx.md P1): judgement line 5.9% above the bottom, highway 0.435
+                    // of the screen wide there. Notes are as tall at the line as USC's 1.25% of its track: 1.05% of this one.
                     return new HighwaySettings
                     {
                         CameraMode = HighwayCameraMode.Perspective,
-                        FarWidthRatio = 0.106f,
+                        LaneTilt = 81.4f,
+                        LaneLength = 11.46f,
+                        Approach = ApproachCurve.PERSPECTIVE,
                         JudgementLineHeight = 0.059f,
-                        FarEdgeHeight = 0.284f,
                         TrackWidth = 0.435f,
-                        NoteThickness = 0.0125f,
+                        NoteThickness = 0.0105f,
                         SpeedScale = SpeedScale.Sdvx,
                     };
 
                 case HighwayPreset.Sekai:
-                    // The fan engine's stage (research/game-sekai.md): judgement line 20.9% above the bottom, high for the thumbs,
-                    // 0.787 of the screen wide there, the lane reaching the top edge, notes 3.4% of the visible time thick. Its
-                    // far/near width is 0.073 where notes appear, but its notes approach on an exponential curve; on this
-                    // perspective, linear in depth, that ratio would make them about 188 times faster at the line than at the
-                    // far edge. 0.18 makes it 31 times, as the engine's alternative approach curve does (30), until the approach
-                    // options can draw Sekai's own curve. Notes are as tall at the line as Sekai's, 7.4% of the screen (its 3.4%
-                    // of the visible time holds only on its curve).
+                    // The fan engine's stage (research/game-sekai.md), confirmed on Alpha's frame of the official game
+                    // (topic-approach-angles.md 7): judgement line 20.9% above the bottom, high for the thumbs, 0.787 of the
+                    // screen wide there, the lane reaching 1.6% below the top edge, its far end 0.073 as wide as the line: a
+                    // lane 57.8° back and 13 screen heights long. Notes approach on Sekai's own curve, growing by the same
+                    // factor every moment, and are 3.4% of the visible time thick: 7.4% of the screen at the line, as Sekai's.
                     return new HighwaySettings
                     {
                         CameraMode = HighwayCameraMode.Perspective,
-                        FarWidthRatio = 0.18f,
+                        LaneTilt = 57.8f,
+                        LaneLength = 13f,
+                        Approach = ApproachCurve.SEKAI,
                         JudgementLineHeight = 0.209f,
-                        FarEdgeHeight = 0,
                         TrackWidth = 0.787f,
-                        NoteThickness = 0.0185f,
+                        NoteThickness = 0.034f,
                         SpeedScale = SpeedScale.Sekai,
                     };
 
-                // The 2D games (research/topic-presets-by-game.md): a straight-on track (parallel lanes, no foreshortening),
-                // their judgement line, lane or stage width and note height, and their speed and cover numbers. Note
-                // thickness is the note's height over the distance from the line to where notes appear.
+                // The 2D games (research/topic-presets-by-game.md): a straight-on track (parallel lanes, no foreshortening,
+                // upright to the top edge), their judgement line, lane or stage width and note height, and their speed and
+                // cover numbers. Note thickness is the note's height over the distance from the line to where notes appear.
 
                 case HighwayPreset.Iidx:
                     // Lanes 3.6% of the screen each (beatoraja's skin: white keys 3.9%, black 3.1%; no scratch lane in
@@ -575,7 +615,7 @@ namespace osu.Game.Rulesets.ManiaOrtho.Highway
                     return new HighwaySettings
                     {
                         CameraMode = HighwayCameraMode.ParallelTilt,
-                        FarWidthRatio = 1,
+                        LaneTilt = 0,
                         JudgementLineHeight = 0.33f,
                         WidthMode = HighwayWidthMode.Lane,
                         LaneWidth = 0.036f,
@@ -590,7 +630,7 @@ namespace osu.Game.Rulesets.ManiaOrtho.Highway
                     return new HighwaySettings
                     {
                         CameraMode = HighwayCameraMode.ParallelTilt,
-                        FarWidthRatio = 1,
+                        LaneTilt = 0,
                         JudgementLineHeight = 0.30f,
                         TrackWidth = 0.26f,
                         NoteThickness = 0.035f,
@@ -603,7 +643,7 @@ namespace osu.Game.Rulesets.ManiaOrtho.Highway
                     return new HighwaySettings
                     {
                         CameraMode = HighwayCameraMode.ParallelTilt,
-                        FarWidthRatio = 1,
+                        LaneTilt = 0,
                         JudgementLineHeight = 0.12f,
                         TrackWidth = 0.25f,
                         NoteThickness = 0.049f,
@@ -617,7 +657,7 @@ namespace osu.Game.Rulesets.ManiaOrtho.Highway
                     return new HighwaySettings
                     {
                         CameraMode = HighwayCameraMode.ParallelTilt,
-                        FarWidthRatio = 1,
+                        LaneTilt = 0,
                         JudgementLineHeight = 0.158f,
                         WidthMode = HighwayWidthMode.Lane,
                         LaneWidth = 0.075f,
@@ -630,9 +670,8 @@ namespace osu.Game.Rulesets.ManiaOrtho.Highway
                     return new HighwaySettings
                     {
                         CameraMode = HighwayCameraMode.ParallelTilt,
-                        FarWidthRatio = 1,
+                        LaneTilt = 0,
                         JudgementLineHeight = 0.12f,
-                        FarEdgeHeight = 0,
                         TrackWidth = 0.45f,
                     };
 

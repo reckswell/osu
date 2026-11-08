@@ -670,7 +670,8 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Highway
         /// <summary>
         /// Without lane lines, notes keep at least a pixel of gap on each side on screen (research/topic-wide-keys.md W3): 1% of
         /// a 10K lane is far under a pixel at Voltex's far end. Where 1% is more, as for 4K near the line under Chunithm, it stays
-        /// 1%. Checked once a note is near the line, so far and near notes are both on screen.
+        /// 1%. Never more than a quarter of the lane: where a lane is under 4 px (10K at SDVX's far end in the test window), the
+        /// gap is that quarter. Checked once a note is near the line, so far and near notes are both on screen.
         /// </summary>
         [TestCase(HighwayPreset.Voltex, 10, false)]
         [TestCase(HighwayPreset.Chunithm, 4, true)]
@@ -703,16 +704,17 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Highway
 
                     foreach (float gap in new[] { bar.Lane0 - lane.X, lane.Y - bar.Lane1 })
                     {
-                        if (gap * trackPixels < HighwayNoteLayer.MIN_GAP_PIXELS - 1e-3f)
+                        if (gap * trackPixels < Math.Min(HighwayNoteLayer.MIN_GAP_PIXELS, width / 4 * trackPixels) - 1e-3f)
                             throw new AssertionException($"under a pixel at depth {farSide}: {gap * trackPixels} px");
 
                         if (Math.Abs(gap - expected) * trackPixels > 1e-3f)
                             throw new AssertionException($"gap {gap * trackPixels} px at depth {farSide}, expected {expected * trackPixels} px");
                     }
 
-                    if (floor > width * HighwayNoteLayer.NOTE_GAP)
+                    // Held at a pixel: the floor is over 1% of the lane and under its quarter.
+                    if (floor > width * HighwayNoteLayer.NOTE_GAP && floor <= width / 4)
                         floored++;
-                    else
+                    else if (floor <= width * HighwayNoteLayer.NOTE_GAP)
                         share++;
                 }
             });

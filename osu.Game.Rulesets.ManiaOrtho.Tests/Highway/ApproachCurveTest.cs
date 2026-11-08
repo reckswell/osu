@@ -45,6 +45,28 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Highway
             }
         }
 
+        /// <summary>
+        /// Rows of mania's stage far above the track (depth up to 1000) stay finite and never move back down: the eased curves
+        /// stop at the vanishing point, as true perspective does.
+        /// </summary>
+        [Test]
+        public void TestFarPastTheFarEdgeStaysFinite([ValueSource(nameof(approaches))] float approach, [Values(-0.05f, 0.05f)] float nudge)
+        {
+            var layout = new HighwayLayout { JudgementY = 0.791f, FarY = 0.016f, NearWidth = 0.787f, FarWidthRatio = 0.073f, Approach = approach + nudge };
+            var projection = new HighwayProjection(layout, new Vector2(1920, 1080));
+            float previous = float.PositiveInfinity;
+
+            foreach (float depth in new[] { 0.5f, 1, 2, 10, 34, 100, 1000, 1e6f })
+            {
+                float y = projection.YAt(depth);
+
+                Assert.That(float.IsFinite(y), $"depth {depth}");
+                Assert.That(y, Is.LessThanOrEqualTo(previous), $"depth {depth}");
+                Assert.That(y, Is.GreaterThanOrEqualTo(projection.VanishingPoint!.Value.Y - 0.01f), $"depth {depth}");
+                previous = y;
+            }
+        }
+
         [Test]
         public void TestPerspectiveIsLinearDepth()
         {

@@ -88,13 +88,46 @@ namespace osu.Game.Rulesets.ManiaOrtho.Tests.Highway
             Assert.That(ratio, Is.EqualTo(1).Within(1e-5f));
         }
 
-        [Test]
-        public void TestParallelCameraKeepsLanesParallel()
+        /// <summary>
+        /// A parallel camera shows no depth, so only the tilt counts: an upright lane reaches the top, and a lane leaning back
+        /// is <c>cos(tilt)</c> of the screen tall above the line.
+        /// </summary>
+        [TestCase(1.2f)]
+        [TestCase(9f)]
+        public void TestParallelCameraKeepsLanesParallel(float length)
         {
-            var (farY, ratio) = new HighwayCamera(60, 1.2f).Project(0.9f, perspective: false);
+            var (farY, ratio) = new HighwayCamera(60, length).Project(0.9f, perspective: false);
 
             Assert.That(ratio, Is.EqualTo(1));
-            Assert.That(farY, Is.EqualTo(0.9f - 1.2f * 0.5f).Within(1e-5f));
+            Assert.That(farY, Is.EqualTo(0.9f - 0.5f).Within(1e-5f));
+            Assert.That(new HighwayCamera(0, length).Project(0.9f, perspective: false).FarY, Is.Zero);
+        }
+
+        /// <summary>
+        /// Parallel lanes under a perspective camera stand upright, as long as the lane is tall.
+        /// </summary>
+        [TestCase(0.941f, 0.3f)]
+        [TestCase(0.88f, 0f)]
+        public void TestUprightPerspectiveLayoutRoundTrips(float judgementY, float farY)
+        {
+            var camera = HighwayCamera.FromLayout(judgementY, farY, 1);
+            var (projectedFarY, ratio) = camera.Project(judgementY);
+
+            Assert.That(camera.Tilt, Is.Zero);
+            Assert.That(projectedFarY, Is.EqualTo(farY).Within(1e-4f));
+            Assert.That(ratio, Is.EqualTo(1).Within(1e-5f));
+        }
+
+        [TestCase(0.9f, 0.4f)]
+        [TestCase(0.67f, 0f)]
+        public void TestParallelLayoutRoundTrips(float judgementY, float farY)
+        {
+            var camera = HighwayCamera.FromLayout(judgementY, farY, 1, perspective: false);
+
+            Assert.That(camera.Project(judgementY, perspective: false).FarY, Is.EqualTo(farY).Within(1e-4f));
+
+            if (farY == 0)
+                Assert.That(camera.Tilt, Is.Zero, "a lane to the top stands upright");
         }
 
         /// <summary>

@@ -111,9 +111,10 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
 
             // Changing any value by hand turns the preset into "Custom".
             GetOriginalBindable<HighwayCameraMode>(HighwaySetting.CameraMode).ValueChanged += _ => onPresetValueChanged();
-            GetOriginalBindable<float>(HighwaySetting.FarWidthRatio).ValueChanged += _ => onPresetValueChanged();
+            GetOriginalBindable<float>(HighwaySetting.LaneTilt).ValueChanged += _ => onPresetValueChanged();
+            GetOriginalBindable<float>(HighwaySetting.LaneLength).ValueChanged += _ => onPresetValueChanged();
+            GetOriginalBindable<float>(HighwaySetting.Approach).ValueChanged += _ => onPresetValueChanged();
             GetOriginalBindable<float>(HighwaySetting.JudgementLineHeight).ValueChanged += _ => onPresetValueChanged();
-            GetOriginalBindable<float>(HighwaySetting.FarEdgeHeight).ValueChanged += _ => onPresetValueChanged();
             GetOriginalBindable<float>(HighwaySetting.TrackWidth).ValueChanged += _ => onPresetValueChanged();
             GetOriginalBindable<float>(HighwaySetting.Wall).ValueChanged += _ => onPresetValueChanged();
             GetOriginalBindable<float>(HighwaySetting.NoteThickness).ValueChanged += _ => onPresetValueChanged();
@@ -137,6 +138,35 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
             ApplySkinPortDefaults();
             applySkinLayoutDefault();
             applyPresetScalesOnce();
+            keepCustomCameraAsTilt();
+        }
+
+        /// <summary>
+        /// Once per install, when the lane's tilt and length replaced the far edge's width and height (Alpha 2026-11-08): a
+        /// Custom camera keeps its shape as the tilt and length that draw it (<see cref="HighwayCamera.FromLayout"/>). A named
+        /// preset already shows its own.
+        /// </summary>
+        private void keepCustomCameraAsTilt()
+        {
+            var applied = GetOriginalBindable<bool>(HighwaySetting.LaneTiltApplied);
+
+            if (applied.Value)
+                return;
+
+            if (Get<HighwayPreset>(HighwaySetting.Preset) == HighwayPreset.Custom)
+            {
+                bool perspective = Get<HighwayCameraMode>(HighwaySetting.CameraMode) == HighwayCameraMode.Perspective;
+                var camera = HighwayCamera.FromLayout(1 - Get<float>(HighwaySetting.JudgementLineHeight), Get<float>(HighwaySetting.FarEdgeHeight),
+                    Get<float>(HighwaySetting.FarWidthRatio), perspective);
+
+                SetValue(HighwaySetting.LaneTilt, camera.Tilt);
+
+                // A parallel camera's tilt alone sets its height; the length stays for a later perspective camera.
+                if (perspective)
+                    SetValue(HighwaySetting.LaneLength, camera.LaneLength);
+            }
+
+            applied.Value = true;
         }
 
         /// <summary>
@@ -224,9 +254,14 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
 
             SetDefault(HighwaySetting.Preset, HighwayPresets.DEFAULT);
             SetDefault(HighwaySetting.CameraMode, defaults.CameraMode);
-            SetDefault(HighwaySetting.FarWidthRatio, defaults.FarWidthRatio, HighwayLayout.MIN_FAR_WIDTH_RATIO, 1f, precision);
+            SetDefault(HighwaySetting.LaneTilt, defaults.LaneTilt, HighwayCamera.MIN_TILT, HighwayCamera.MAX_TILT, 0.1f);
+            SetDefault(HighwaySetting.LaneLength, defaults.LaneLength, HighwayCamera.MIN_LANE_LENGTH, HighwayCamera.MAX_LANE_LENGTH, 0.01f);
+            SetDefault(HighwaySetting.Approach, defaults.Approach, ApproachCurve.PERSPECTIVE, ApproachCurve.EVEN, 0.05f);
             SetDefault(HighwaySetting.JudgementLineHeight, defaults.JudgementLineHeight, 0f, HighwaySettings.MAX_JUDGEMENT_LINE_HEIGHT, precision);
-            SetDefault(HighwaySetting.FarEdgeHeight, defaults.FarEdgeHeight, 0f, 0.5f, precision);
+            // Read once, by keepCustomCameraAsTilt: the far edge as set before the lane's tilt and length (Chunithm's then).
+            SetDefault(HighwaySetting.FarWidthRatio, 0.24f, HighwayLayout.MIN_FAR_WIDTH_RATIO, 1f, precision);
+            SetDefault(HighwaySetting.FarEdgeHeight, 0f, 0f, 0.5f, precision);
+            SetDefault(HighwaySetting.LaneTiltApplied, false);
             SetDefault(HighwaySetting.TrackWidth, defaults.TrackWidth, 0.2f, 1f, precision);
             // Fine enough for every scale's units (a white number is a thousandth of the lane on screen).
             SetDefault(HighwaySetting.Wall, defaults.Wall, 0f, HighwayScroll.MAX_WALL, 0.0001f);
@@ -248,6 +283,7 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
             SetDefault(HighwaySetting.TrackOpacity, defaults.TrackOpacity, 0f, 1f, 0.01f);
             SetDefault(HighwaySetting.KeyBeam, defaults.KeyBeam);
             SetDefault(HighwaySetting.KiaiSway, defaults.KiaiSway, 0f, 1f, 0.01f);
+            SetDefault(HighwaySetting.KiaiLift, defaults.KiaiLift, 0f, 1f, 0.01f);
             SetDefault(HighwaySetting.WallScale, defaults.WallScale);
             SetDefault(HighwaySetting.ShareManiaKeys, true);
             SetDefault(HighwaySetting.SpeedScale, defaults.SpeedScale);
@@ -264,9 +300,10 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
         public HighwaySettings Current => new HighwaySettings
         {
             CameraMode = Get<HighwayCameraMode>(HighwaySetting.CameraMode),
-            FarWidthRatio = Get<float>(HighwaySetting.FarWidthRatio),
+            LaneTilt = Get<float>(HighwaySetting.LaneTilt),
+            LaneLength = Get<float>(HighwaySetting.LaneLength),
+            Approach = Get<float>(HighwaySetting.Approach),
             JudgementLineHeight = Get<float>(HighwaySetting.JudgementLineHeight),
-            FarEdgeHeight = Get<float>(HighwaySetting.FarEdgeHeight),
             TrackWidth = Get<float>(HighwaySetting.TrackWidth),
             Wall = Get<float>(HighwaySetting.Wall),
             NoteThickness = Get<float>(HighwaySetting.NoteThickness),
@@ -286,6 +323,7 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
             TrackOpacity = Get<float>(HighwaySetting.TrackOpacity),
             KeyBeam = Get<KeyBeamLength>(HighwaySetting.KeyBeam),
             KiaiSway = Get<float>(HighwaySetting.KiaiSway),
+            KiaiLift = Get<float>(HighwaySetting.KiaiLift),
             WallScale = Get<WallScale>(HighwaySetting.WallScale),
             SpeedScale = Get<SpeedScale>(HighwaySetting.SpeedScale),
             WidthMode = Get<HighwayWidthMode>(HighwaySetting.WidthMode),
@@ -293,13 +331,13 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
         };
 
         /// <summary>
-        /// Writes a preset's look into the individual settings: camera, width, line and note thickness, and takes the wall
-        /// down for a game without one (a game with one leaves it to the player). Leaves
+        /// Writes a preset's look into the individual settings: camera (lane tilt, length and note approach), width, line and
+        /// note thickness, and takes the wall down for a game without one (a game with one leaves it to the player). Leaves
         /// <see cref="HighwaySetting.WallKeepsVisibleTime"/>, <see cref="HighwaySetting.LaneGuides"/>,
         /// <see cref="HighwaySetting.SkinHitTarget"/>, <see cref="HighwaySetting.NoteStyle"/>, <see cref="HighwaySetting.HitEffects"/>,
         /// <see cref="HighwaySetting.Track"/>, <see cref="HighwaySetting.FarFade"/>, <see cref="HighwaySetting.HoldOpacity"/>,
-        /// <see cref="HighwaySetting.TrackOpacity"/>, <see cref="HighwaySetting.KeyBeam"/>, <see cref="HighwaySetting.KiaiSway"/> and
-        /// the skin porter's settings alone (preferences, not part of a game's look). The game's speed and wall scales are
+        /// <see cref="HighwaySetting.TrackOpacity"/>, <see cref="HighwaySetting.KeyBeam"/>, <see cref="HighwaySetting.KiaiSway"/>,
+        /// <see cref="HighwaySetting.KiaiLift"/> and the skin porter's settings alone (preferences, not part of a game's look). The game's speed and wall scales are
         /// <see cref="ApplyPresetScales"/>.
         /// </summary>
         public void ApplyPreset(HighwayPreset preset)
@@ -315,9 +353,10 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
             try
             {
                 SetValue(HighwaySetting.CameraMode, values.CameraMode);
-                SetValue(HighwaySetting.FarWidthRatio, values.FarWidthRatio);
+                SetValue(HighwaySetting.LaneTilt, values.LaneTilt);
+                SetValue(HighwaySetting.LaneLength, values.LaneLength);
+                SetValue(HighwaySetting.Approach, values.Approach);
                 SetValue(HighwaySetting.JudgementLineHeight, values.JudgementLineHeight);
-                SetValue(HighwaySetting.FarEdgeHeight, values.FarEdgeHeight);
                 SetValue(HighwaySetting.TrackWidth, values.TrackWidth);
                 SetValue(HighwaySetting.NoteThickness, values.NoteThickness);
                 SetValue(HighwaySetting.WidthMode, values.WidthMode);
@@ -367,8 +406,9 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
 
         /// <summary>
         /// Whether the current look is still the preset's. The wall counts only for a game without one (it must stay down); the
-        /// lane width only when the preset sets the width by lane (it is hidden and unused otherwise). The track width always
-        /// counts: ported and warped skin stages use it in every width mode.
+        /// lane width only when the preset sets the width by lane (it is hidden and unused otherwise); the lane length and the
+        /// note approach only under a perspective camera (a parallel one ignores them). The track width always counts: ported
+        /// and warped skin stages use it in every width mode.
         /// </summary>
         private bool matches(HighwayPreset presetName)
         {
@@ -380,10 +420,12 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
             if (preset.CameraMode == HighwayCameraMode.Flat)
                 return current.CameraMode == HighwayCameraMode.Flat && wallMatches;
 
+            bool perspective = preset.CameraMode == HighwayCameraMode.Perspective;
+
             return current.CameraMode == preset.CameraMode
-                   && near(current.FarWidthRatio, preset.FarWidthRatio)
+                   && near(current.LaneTilt, preset.LaneTilt)
+                   && (!perspective || (near(current.LaneLength, preset.LaneLength) && near(current.Approach, preset.Approach)))
                    && near(current.JudgementLineHeight, preset.JudgementLineHeight)
-                   && near(current.FarEdgeHeight, preset.FarEdgeHeight)
                    && near(current.TrackWidth, preset.TrackWidth)
                    && current.WidthMode == preset.WidthMode
                    && (preset.WidthMode != HighwayWidthMode.Lane || near(current.LaneWidth, preset.LaneWidth))
@@ -398,9 +440,21 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
     {
         Preset,
         CameraMode,
+
+        /// <summary>
+        /// Not shown: the far end's width before <see cref="LaneTilt"/> and <see cref="LaneLength"/> replaced it, read once to
+        /// keep a Custom camera's shape (<c>keepCustomCameraAsTilt</c>).
+        /// </summary>
         FarWidthRatio,
+
         JudgementLineHeight,
+
+        /// <summary>
+        /// Not shown: the far edge's height before <see cref="LaneTilt"/> and <see cref="LaneLength"/> replaced it, read once to
+        /// keep a Custom camera's shape (<c>keepCustomCameraAsTilt</c>).
+        /// </summary>
         FarEdgeHeight,
+
         TrackWidth,
         Wall,
         WallKeepsVisibleTime,
@@ -466,5 +520,31 @@ namespace osu.Game.Rulesets.ManiaOrtho.Configuration
         /// (<c>applySkinLayoutDefault</c>, Alpha 2026-11-04) has run on this install.
         /// </summary>
         SkinLayoutDefaultApplied,
+
+        /// <summary>
+        /// How far the lane leans back, in degrees (<see cref="HighwaySettings.LaneTilt"/>).
+        /// </summary>
+        LaneTilt,
+
+        /// <summary>
+        /// How long the lane is, in screen heights (<see cref="HighwaySettings.LaneLength"/>).
+        /// </summary>
+        LaneLength,
+
+        /// <summary>
+        /// How notes travel down the lane (<see cref="HighwaySettings.Approach"/>).
+        /// </summary>
+        Approach,
+
+        /// <summary>
+        /// How far the lane lifts in kiai sections (<see cref="HighwaySettings.KiaiLift"/>).
+        /// </summary>
+        KiaiLift,
+
+        /// <summary>
+        /// Not shown: whether a Custom camera's far edge has been turned into a lane tilt and length on this install
+        /// (<c>keepCustomCameraAsTilt</c>, Alpha 2026-11-08).
+        /// </summary>
+        LaneTiltApplied,
     }
 }

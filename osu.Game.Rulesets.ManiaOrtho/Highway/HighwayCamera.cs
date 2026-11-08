@@ -35,7 +35,11 @@ namespace osu.Game.Rulesets.ManiaOrtho.Highway
         public const float MIN_TILT = 0;
         public const float MAX_TILT = 85;
 
-        public const float MIN_LANE_LENGTH = 1;
+        /// <summary>
+        /// The shortest lane: short enough for a weak perspective (far end 3/4 as wide as the line at the steepest tilt).
+        /// </summary>
+        public const float MIN_LANE_LENGTH = 0.25f;
+
         public const float MAX_LANE_LENGTH = 16;
 
         /// <summary>
@@ -65,8 +69,10 @@ namespace osu.Game.Rulesets.ManiaOrtho.Highway
         /// wide its far end is next to the judgement line (<see cref="HighwayLayout.FarWidthRatio"/>).
         /// </summary>
         /// <param name="judgementY">The judgement line's height, as a fraction of the screen height from the top.</param>
-        /// <param name="perspective">False for a parallel (orthographic) camera: lanes stay parallel and only the lane's
-        /// height on screen follows the tilt.</param>
+        /// <param name="perspective">False for a parallel (orthographic) camera: lanes stay parallel, nothing shows how long
+        /// the lane is, and only the tilt counts. A lane one screen height long (<see cref="LaneLength"/> is ignored) is
+        /// <c>cos(tilt)</c> of the screen tall above the line, so it reaches the top edge upright and shortens as it leans
+        /// back.</param>
         public (float FarY, float FarWidthRatio) Project(float judgementY, bool perspective = true)
         {
             double tilt = Math.Clamp(float.IsFinite(Tilt) ? Tilt : 0, MIN_TILT, MAX_TILT) * Math.PI / 180;
@@ -75,7 +81,7 @@ namespace osu.Game.Rulesets.ManiaOrtho.Highway
             double sin = Math.Sin(tilt);
 
             if (!perspective)
-                return ((float)Math.Max(0, judgementY - length * cos), 1);
+                return ((float)Math.Max(0, judgementY - cos), 1);
 
             double f = focal_length;
             double below = judgementY - 0.5;
@@ -97,11 +103,20 @@ namespace osu.Game.Rulesets.ManiaOrtho.Highway
         /// wide as the judgement line. Used to turn measured screen geometry (and settings saved before tilt existed) into a
         /// tilt and a length.
         /// </summary>
-        public static HighwayCamera FromLayout(float judgementY, float farY, float farWidthRatio)
+        /// <param name="judgementY">The judgement line's height, as a fraction of the screen height from the top.</param>
+        /// <param name="farY">Where the lane ends, as a fraction of the screen height from the top.</param>
+        /// <param name="farWidthRatio">The far end's width next to the judgement line's.</param>
+        /// <param name="perspective">Whether the camera is a perspective one (<see cref="Project"/>).</param>
+        public static HighwayCamera FromLayout(float judgementY, float farY, float farWidthRatio, bool perspective = true)
         {
             float span = Math.Max(0.01f, judgementY - farY);
 
-            // Parallel lanes: an upright lane as tall as the span.
+            // Parallel lanes under a parallel camera: the tilt that makes its lane as tall as the span; upright if it reaches
+            // the top.
+            if (!perspective)
+                return new HighwayCamera(farY <= 0 ? 0 : (float)(Math.Acos(Math.Min(1, span)) * 180 / Math.PI), 1);
+
+            // Parallel lanes under a perspective camera: an upright lane as long as the span.
             if (farWidthRatio >= 1 - 1e-4f)
                 return new HighwayCamera(0, Math.Clamp(span, MIN_LANE_LENGTH, MAX_LANE_LENGTH));
 
